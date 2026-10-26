@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --canvas: #fbf9f8;
+    --surface: #ffffff;
+    --surface-low: #f5f3f3;
+    --surface-container: #efeded;
+    --surface-high: #e9e8e7;
+    --surface-highest: #e4e2e2;
+    
+    --border: #e6e6e6;
+    --border-variant: #e1bfb5;
+    --border-hover: #d4d4d4;
+
+    --primary: #ac3500;
+    --primary-accent: #ff6c37;
+    --primary-hover: #e8590c;
+    --primary-tint: #fff1eb;
+
+    --text-primary: #212121;
+    --text-secondary: #6b6b6b;
+    --text-muted: #8c8c8c;
+
+    --status-pass: #12b76a;
+    --status-pass-bg: #ecfdf3;
+    --status-fail: #f04438;
+    --status-fail-bg: #fef3f2;
+    --status-warning: #f79009;
+    --status-warning-bg: #fffaeb;
+    --status-running: #0ba5ec;
+    --status-running-bg: #f0f9ff;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  /* Clean developer-grade scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #e6e6e6;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #d4d4d4;
+  }
+}
+
+/* Tabular figures for numerical metrics */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle micro-borders and elevation per TestPilot DESIGN.md */
+.tp-card {
+  background-color: #ffffff;
+  border: 1px solid #e6e6e6;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.tp-card-hover:hover {
+  background-color: #ffffff;
+  border-color: #d4d4d4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.tp-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff1eb, 0 0 0 3px #ff6c37;
+  border-color: #ff6c37;
+}
