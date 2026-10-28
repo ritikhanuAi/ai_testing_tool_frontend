@@ -1,28 +1,27 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Card } from "@/components/common/Card";
 import { Button } from "@/components/common/Button";
 import { GradeBadge } from "@/components/common/GradeBadge";
-import { getStatusBadge, formatDate } from "@/lib/utils";
+import { getStatusBadge } from "@/lib/utils";
 import { useTestRun, useCancelScan } from "@/features/test-runs";
 import { useWebsites } from "@/features/websites";
 import { useScanProfiles } from "@/features/scan-profiles";
+import { TestRunPillarPipeline } from "@/components/test-runs/TestRunPillarPipeline";
+import { TestRunTerminalStream } from "@/components/test-runs/TestRunTerminalStream";
 import {
   ArrowLeft,
   Square,
   CheckCircle2,
-  Clock,
-  Shield,
-  Zap,
-  Activity,
-  Layers,
   ArrowRight,
-  Terminal,
+  Loader2,
+  FlaskConical,
+  Ban,
+  AlertCircle,
+  Play,
 } from "lucide-react";
-
 
 function TestRunMonitorContent() {
   const params = useParams();
@@ -32,24 +31,34 @@ function TestRunMonitorContent() {
   const { data: websites = [] } = useWebsites();
   const { data: profiles = [] } = useScanProfiles();
   const cancelScan = useCancelScan();
+  const [abortError, setAbortError] = useState<string | null>(null);
 
   const site = websites.find((w) => w.id === run?.website_id);
   const profile = profiles.find((p) => p.id === run?.scan_profile_id);
 
   if (isLoading) {
     return (
-      <div className="py-24 text-center text-slate-400">
-        Loading run execution telemetry...
+      <div className="py-24 text-center">
+        <div className="inline-flex flex-col items-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin text-[#FF6C37]" />
+          <span className="text-xs text-[#8C8C8C] font-medium">Loading run execution telemetry...</span>
+        </div>
       </div>
     );
   }
 
   if (!run) {
     return (
-      <div className="py-24 text-center text-slate-400 space-y-4">
-        <p>Test run &quot;{runId}&quot; not found.</p>
+      <div className="py-24 text-center space-y-4">
+        <div className="w-12 h-12 rounded-full bg-[#F5F3F3] border border-[#E6E6E6] flex items-center justify-center text-[#6B6B6B] mx-auto">
+          <FlaskConical className="w-6 h-6 text-[#FF6C37]" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-[#212121]">Test Run Not Found</h3>
+          <p className="text-xs text-[#6B6B6B]">The requested execution session could not be located.</p>
+        </div>
         <Link href="/test-runs">
-          <Button variant="outline">Back to Runs</Button>
+          <Button variant="secondary" size="sm">Back to Test Runs</Button>
         </Link>
       </div>
     );
@@ -57,53 +66,54 @@ function TestRunMonitorContent() {
 
   const isRunning = run.status === "running" || run.status === "pending" || run.status === "queued";
   const isCompleted = run.status === "completed";
+  const isCancelled = run.status === "cancelled";
   const statusBadge = getStatusBadge(run.status);
 
-  // Stepper stages
-  const STAGES = [
-    {
-      id: "functional",
-      title: "1. Functional Pillar",
-      subtitle: "Playwright Headless Browser Workflows",
-      icon: Layers,
-    },
-    {
-      id: "security",
-      title: "2. Security & Headers Pillar",
-      subtitle: "OWASP Probes & TLS Configuration",
-      icon: Shield,
-    },
-    {
-      id: "performance",
-      title: "3. Performance Pillar",
-      subtitle: "Core Web Vitals & TTFB Telemetry",
-      icon: Zap,
-    },
-    {
-      id: "accessibility",
-      title: "4. Accessibility Pillar",
-      subtitle: "WCAG 2.1 AA Automated Rule Checks",
-      icon: Activity,
-    },
-  ];
+  const handleAbort = async () => {
+    if (window.confirm("Are you sure you want to abort this active scan? This will immediately terminate all running worker processes.")) {
+      try {
+        setAbortError(null);
+        await cancelScan.mutateAsync(run.id);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to abort scan. Please try again.";
+        setAbortError(msg);
+      }
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 animate-in fade-in duration-150">
+      {/* Abort Error Banner if any */}
+      {abortError && (
+        <div className="p-3.5 rounded-lg bg-[#FEF3F2] border border-[#F04438]/30 text-xs text-[#93000A] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-[#F04438] shrink-0" />
+            <span>{abortError}</span>
+          </div>
+          <button
+            onClick={() => setAbortError(null)}
+            className="text-[11px] font-semibold text-[#93000A] hover:underline cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Top Navigation & Status Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link href="/test-runs">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4" />
+            <Button variant="secondary" size="sm" className="h-9 w-9 p-0">
+              <ArrowLeft className="w-4 h-4 text-[#6B6B6B]" />
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold tracking-tight text-white font-mono">
-                {run.id}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl font-bold tracking-tight text-[#212121]">
+                {site?.name || "Website Execution Monitor"}
               </h1>
               <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase ${statusBadge.classes}`}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase ${statusBadge.classes}`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot} ${
@@ -113,21 +123,22 @@ function TestRunMonitorContent() {
                 {statusBadge.label}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Target: <span className="text-slate-200 font-mono">{site?.base_url || run.website_id}</span>
+            <p className="text-xs text-[#6B6B6B] mt-0.5 flex items-center gap-1.5 font-mono">
+              <span>Target:</span>
+              <span className="text-[#212121] font-medium">{site?.base_url || run.website_id}</span>
             </p>
           </div>
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {isRunning && (
             <Button
               variant="danger"
               size="sm"
               leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
               isLoading={cancelScan.isPending}
-              onClick={() => cancelScan.mutate(run.id)}
+              onClick={handleAbort}
             >
               Abort Scan
             </Button>
@@ -139,9 +150,20 @@ function TestRunMonitorContent() {
                 variant="primary"
                 size="md"
                 rightIcon={<ArrowRight className="w-4 h-4" />}
-                className="glow-indigo"
               >
                 View 4-Pillar Report
+              </Button>
+            </Link>
+          )}
+
+          {isCancelled && (
+            <Link href="/websites">
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<Play className="w-3 h-3 fill-current" />}
+              >
+                Rerun Test
               </Button>
             </Link>
           )}
@@ -150,19 +172,21 @@ function TestRunMonitorContent() {
 
       {/* Completion Banner */}
       {isCompleted && (
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-indigo-500/10 to-slate-900 border border-emerald-500/40 glow-emerald flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-              <CheckCircle2 className="w-8 h-8" />
+        <div className="p-5 sm:p-6 rounded-xl bg-gradient-to-r from-[#F6FEF9] to-white border border-[#12B76A]/30 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-[#ECFDF3] text-[#12B76A] border border-[#12B76A]/20 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-white">Audit Execution Complete</span>
+                <span className="text-base sm:text-lg font-bold text-[#212121]">
+                  Audit Execution Complete
+                </span>
                 <GradeBadge grade={run.grade || "A"} size="sm" />
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
+              <p className="text-xs text-[#6B6B6B] mt-0.5">
                 All 4 quality pillars passed evaluation with an overall score of{" "}
-                <span className="font-bold text-emerald-400 font-mono">
+                <span className="font-bold text-[#12B76A] font-mono">
                   {run.overall_score?.toFixed(1)} / 100
                 </span>
                 .
@@ -177,117 +201,70 @@ function TestRunMonitorContent() {
         </div>
       )}
 
+      {/* Cancelled Banner */}
+      {isCancelled && (
+        <div className="p-5 sm:p-6 rounded-xl bg-[#F5F3F3] border border-[#E6E6E6] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-full bg-white text-[#8C8C8C] border border-[#E6E6E6] flex items-center justify-center shrink-0">
+              <Ban className="w-5 h-5 text-[#8C8C8C]" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-[#212121]">
+                Scan Execution Aborted
+              </h3>
+              <p className="text-xs text-[#6B6B6B] mt-0.5">
+                This audit session was manually cancelled before all quality pillars could complete.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/test-runs">
+              <Button variant="secondary" size="sm">
+                Back to Test Runs
+              </Button>
+            </Link>
+            <Link href="/websites">
+              <Button variant="primary" size="sm" leftIcon={<Play className="w-3 h-3 fill-current" />}>
+                Launch New Scan
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* 4-Pillar Live Execution Stepper */}
-      <Card>
-        <div className="mb-4 pb-3 border-b border-slate-800">
-          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
-            Quality Pillar Execution Pipeline
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Synchronous 4-stage browser harness and security telemetry evaluation
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {STAGES.map((stage, idx) => {
-            const Icon = stage.icon;
-            // Simulated stage progression
-            const isStageDone = isCompleted;
-            const isStageActive = isRunning && idx === 0;
-
-            return (
-              <div
-                key={stage.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  isStageDone
-                    ? "bg-slate-900/90 border-emerald-500/30"
-                    : isStageActive
-                    ? "bg-indigo-950/40 border-indigo-500/60 glow-indigo animate-pulse"
-                    : "bg-slate-950/40 border-slate-800/80 opacity-60"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="p-2 rounded-lg bg-slate-800 text-indigo-400">
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  {isStageDone ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  ) : isStageActive ? (
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-                  ) : (
-                    <Clock className="w-4 h-4 text-slate-400" />
-                  )}
-                </div>
-                <h4 className="text-xs font-bold text-slate-200">{stage.title}</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{stage.subtitle}</p>
-                <div className="mt-3 pt-2 border-t border-slate-800 text-[10px] font-mono">
-                  {isStageDone ? (
-                    <span className="text-emerald-400 font-semibold">STAGE PASSED</span>
-                  ) : isStageActive ? (
-                    <span className="text-indigo-400 font-semibold">RUNNING CHECKS...</span>
-                  ) : (
-                    <span className="text-slate-400">QUEUED</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+      <TestRunPillarPipeline
+        isCompleted={isCompleted}
+        isRunning={isRunning}
+      />
 
       {/* Terminal Live Trace Console */}
-      <Card className="p-5 font-mono">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <Terminal className="w-4 h-4 text-indigo-400" />
-            <span>Runner Telemetry Stream</span>
-          </div>
-          <span className="text-[10px] text-slate-400">Chromium v128.0.6613.119</span>
-        </div>
-
-        <div className="bg-black/60 rounded-xl p-4 text-xs space-y-2 text-slate-300 max-h-60 overflow-y-auto">
-          <p className="text-slate-400">
-            [{formatDate(run.started_at)}] Initializing autonomous browser session on {site?.base_url}...
-          </p>
-          <p className="text-cyan-400">
-            [{formatDate(run.started_at)}] Applied profile: {profile?.name || "Full 4-Pillar"} (Rate: {profile?.rate_limit || 15} req/s)
-          </p>
-          <p className="text-slate-300">
-            [+] Browser context initialized with Chromium headless runner.
-          </p>
-          <p className="text-indigo-400">
-            [+] Functional Pillar: Dispatching synthetic YAML actions & assertion verifications...
-          </p>
-          {isCompleted && (
-            <>
-              <p className="text-emerald-400">
-                [+] Security Pillar: 14 HTTP headers verified. TLS certificate valid (SHA-256).
-              </p>
-              <p className="text-emerald-400">
-                [+] Performance Pillar: Core Web Vitals calculated. TTFB: 210ms, LCP: 2.4s.
-              </p>
-              <p className="text-emerald-400">
-                [+] Accessibility Pillar: 48 Axe-Core WCAG AA rules evaluated without critical blockers.
-              </p>
-              <p className="text-emerald-400 font-bold">
-                [✓] Audit finished successfully. Report synthesized with score {run.overall_score?.toFixed(1)}.
-              </p>
-            </>
-          )}
-          {isRunning && (
-            <p className="text-indigo-300 animate-pulse">
-              [•] Probing DOM nodes, network waterfall, and security exposure endpoints...
-            </p>
-          )}
-        </div>
-      </Card>
+      <TestRunTerminalStream
+        startedAt={run.started_at}
+        targetUrl={site?.base_url || run.website_id}
+        profileName={profile?.name}
+        rateLimit={profile?.rate_limit}
+        overallScore={run.overall_score}
+        isCompleted={isCompleted}
+        isRunning={isRunning}
+        isCancelled={isCancelled}
+      />
     </div>
   );
 }
 
 export default function TestRunMonitorPage() {
   return (
-    <React.Suspense fallback={<div className="py-24 text-center text-slate-400">Loading run execution telemetry...</div>}>
+    <React.Suspense
+      fallback={
+        <div className="py-24 text-center">
+          <div className="inline-flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-[#FF6C37]" />
+            <span className="text-xs text-[#8C8C8C] font-medium">Loading run execution telemetry...</span>
+          </div>
+        </div>
+      }
+    >
       <TestRunMonitorContent />
     </React.Suspense>
   );

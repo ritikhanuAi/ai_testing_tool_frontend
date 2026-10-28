@@ -38,39 +38,39 @@ export function getGradeBadge(grade?: string) {
   if (g.startsWith("A")) {
     return {
       grade: g,
-      bg: "bg-emerald-500/15 border-emerald-500/40 text-emerald-400",
-      glow: "glow-emerald",
+      bg: "bg-[#ECFDF3] border-[#12B76A]/40 text-[#027A48]",
+      glow: "",
       label: "Excellent",
     };
   }
   if (g.startsWith("B")) {
     return {
       grade: g,
-      bg: "bg-blue-500/15 border-blue-500/40 text-blue-400",
-      glow: "glow-indigo",
+      bg: "bg-[#EFF8FF] border-[#0BA5EC]/40 text-[#026AA2]",
+      glow: "",
       label: "Good",
     };
   }
   if (g.startsWith("C")) {
     return {
       grade: g,
-      bg: "bg-amber-500/15 border-amber-500/40 text-amber-400",
-      glow: "glow-cyan",
+      bg: "bg-[#FFFAEB] border-[#F79009]/40 text-[#B54708]",
+      glow: "",
       label: "Moderate",
     };
   }
   if (g.startsWith("D")) {
     return {
       grade: g,
-      bg: "bg-orange-500/15 border-orange-500/40 text-orange-400",
+      bg: "bg-[#FFF4ED] border-[#FB6514]/40 text-[#B93815]",
       glow: "",
       label: "Poor",
     };
   }
   return {
     grade: g,
-    bg: "bg-rose-500/15 border-rose-500/40 text-rose-400",
-    glow: "glow-rose",
+    bg: "bg-[#FEF3F2] border-[#F04438]/40 text-[#B42318]",
+    glow: "",
     label: "Failing",
   };
 }
@@ -81,32 +81,32 @@ export function getSeverityBadge(severity: FindingSeverity | string) {
     case "critical":
       return {
         label: "Critical",
-        classes: "bg-rose-500/20 text-rose-300 border-rose-500/50",
-        dot: "bg-rose-500",
+        classes: "bg-[#FEF3F2] text-[#93000A] border-[#F04438]/30",
+        dot: "bg-[#F04438]",
       };
     case "high":
       return {
         label: "High",
-        classes: "bg-orange-500/20 text-orange-300 border-orange-500/50",
-        dot: "bg-orange-500",
+        classes: "bg-[#FFF4ED] text-[#B93815] border-[#FB6514]/30",
+        dot: "bg-[#FB6514]",
       };
     case "medium":
       return {
         label: "Medium",
-        classes: "bg-amber-500/20 text-amber-300 border-amber-500/50",
-        dot: "bg-amber-500",
+        classes: "bg-[#FFFAEB] text-[#7A3E00] border-[#F79009]/30",
+        dot: "bg-[#F79009]",
       };
     case "low":
       return {
         label: "Low",
-        classes: "bg-blue-500/20 text-blue-300 border-blue-500/50",
-        dot: "bg-blue-500",
+        classes: "bg-[#EFF8FF] text-[#026AA2] border-[#0BA5EC]/30",
+        dot: "bg-[#0BA5EC]",
       };
     default:
       return {
         label: "Info",
-        classes: "bg-slate-500/20 text-slate-300 border-slate-500/40",
-        dot: "bg-slate-400",
+        classes: "bg-[#F5F3F3] text-[#594139] border-[#E6E6E6]",
+        dot: "bg-[#8C8C8C]",
       };
   }
 }
@@ -117,38 +117,38 @@ export function getStatusBadge(status: RunStatus | string) {
     case "completed":
       return {
         label: "Completed",
-        classes: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-        dot: "bg-emerald-500",
+        classes: "bg-[#ECFDF3] text-[#006D3C] border-[#12B76A]/30",
+        dot: "bg-[#12B76A]",
         pulse: false,
       };
     case "running":
       return {
         label: "Running",
-        classes: "bg-indigo-500/20 text-indigo-300 border-indigo-500/50",
-        dot: "bg-indigo-400",
+        classes: "bg-[#F0F9FF] text-[#004667] border-[#0BA5EC]/30",
+        dot: "bg-[#0BA5EC]",
         pulse: true,
       };
     case "queued":
     case "pending":
       return {
         label: s === "queued" ? "Queued" : "Pending",
-        classes: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-        dot: "bg-amber-400",
+        classes: "bg-[#FFFAEB] text-[#7A3E00] border-[#F79009]/30",
+        dot: "bg-[#F79009]",
         pulse: true,
       };
     case "cancelled":
       return {
         label: "Cancelled",
-        classes: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-        dot: "bg-slate-400",
+        classes: "bg-[#F5F3F3] text-[#6B6B6B] border-[#E6E6E6]",
+        dot: "bg-[#8C8C8C]",
         pulse: false,
       };
     case "failed":
     default:
       return {
         label: "Failed",
-        classes: "bg-rose-500/20 text-rose-400 border-rose-500/40",
-        dot: "bg-rose-500",
+        classes: "bg-[#FEF3F2] text-[#93000A] border-[#F04438]/30",
+        dot: "bg-[#F04438]",
         pulse: false,
       };
   }
