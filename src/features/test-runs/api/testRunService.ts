@@ -3,7 +3,12 @@ import { API_CONFIG } from "@/lib/api/config";
 import { TEST_RUN_ENDPOINTS } from "./endpoints";
 import { mockStore } from "@/lib/mock/store";
 import { ResponseEnvelope } from "@/types/api";
-import { TestRunResponse, TriggerScanRequest } from "@/types/test-run";
+import {
+  TestRunResponse,
+  TriggerScanRequest,
+  QuickScanRequest,
+  WebsiteAnalyzeResponse,
+} from "@/types/test-run";
 
 export async function getTestRuns(): Promise<TestRunResponse[]> {
   if (API_CONFIG.useMock) return mockStore.getTestRuns();
@@ -28,6 +33,23 @@ export async function triggerScan(payload: TriggerScanRequest): Promise<TestRunR
   const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
     TEST_RUN_ENDPOINTS.TRIGGER,
     payload
+  );
+  return res.data.data;
+}
+
+export async function quickScan(payload: QuickScanRequest): Promise<TestRunResponse> {
+  if (API_CONFIG.useMock) return mockStore.triggerScan({ website_id: "mock-site-1" });
+  const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
+    TEST_RUN_ENDPOINTS.QUICK_SCAN,
+    payload
+  );
+  return res.data.data;
+}
+
+export async function analyzeUrl(url: string): Promise<WebsiteAnalyzeResponse> {
+  const res = await axiosClient.post<ResponseEnvelope<WebsiteAnalyzeResponse>>(
+    TEST_RUN_ENDPOINTS.ANALYZE_URL,
+    { url }
   );
   return res.data.data;
 }

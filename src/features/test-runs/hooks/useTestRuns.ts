@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as testRunService from "../api/testRunService";
-import { TriggerScanRequest, TestRunResponse } from "@/types/test-run";
+import {
+  TriggerScanRequest,
+  TestRunResponse,
+  QuickScanRequest,
+  WebsiteAnalyzeResponse,
+} from "@/types/test-run";
 
 export function useTestRuns() {
   return useQuery({
@@ -33,6 +38,25 @@ export function useTriggerScan() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
     },
+  });
+}
+
+export function useQuickScan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: QuickScanRequest) => testRunService.quickScan(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["test-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["websites"] });
+    },
+  });
+}
+
+export function useAnalyzeUrl() {
+  return useMutation({
+    mutationFn: (url: string) => testRunService.analyzeUrl(url),
   });
 }
 

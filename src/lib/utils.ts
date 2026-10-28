@@ -21,11 +21,17 @@ export function formatDate(dateStr?: string | null): string {
 }
 
 export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.round(seconds % 60);
-  return `${mins}m ${secs}s`;
+  if (isNaN(seconds) || seconds < 0) return "--";
+  const totalSeconds = Math.round(seconds);
+  const hrs = Math.floor(totalSeconds / 3600);
+  const remainingSeconds = totalSeconds % 3600;
+  const rawMins = Math.round(remainingSeconds / 60);
+  const mins = totalSeconds > 0 && hrs === 0 && rawMins === 0 ? 1 : rawMins;
+  const finalHrs = hrs + Math.floor(mins / 60);
+  const finalMins = mins % 60;
+  return `${finalHrs} hr:${finalMins} m`;
 }
+
 
 export function getGradeBadge(grade?: string) {
   const g = (grade || "F").toUpperCase();

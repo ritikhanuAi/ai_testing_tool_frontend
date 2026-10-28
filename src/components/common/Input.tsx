@@ -90,23 +90,43 @@ export interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  className?: string;
+  id?: string;
 }
 
-export function Switch({ label, description, checked, onChange, disabled }: SwitchProps) {
+export function Switch({ label, description, checked, onChange, disabled, className, id }: SwitchProps) {
+  const switchId = id || `switch-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
+
   return (
-    <div className="flex items-center justify-between py-2">
-      <div className="space-y-0.5">
-        <label className="text-sm font-medium text-[#212121] cursor-pointer select-none">
+    <div
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
+      className={cn(
+        "flex items-center justify-between py-2 cursor-pointer select-none group",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
+      )}
+    >
+      <div className="space-y-0.5 pr-4 flex-1">
+        <label
+          htmlFor={switchId}
+          className="text-sm font-medium text-[#212121] group-hover:text-[#FF6C37] transition-colors cursor-pointer"
+        >
           {label}
         </label>
-        {description && <p className="text-xs text-[#6B6B6B]">{description}</p>}
+        {description && <p className="text-xs text-[#6B6B6B] leading-relaxed">{description}</p>}
       </div>
       <button
+        id={switchId}
         type="button"
         role="switch"
         aria-checked={checked}
         disabled={disabled}
-        onClick={() => onChange(!checked)}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) onChange(!checked);
+        }}
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FF6C37] focus:ring-offset-2 focus:ring-offset-white disabled:opacity-50",
           checked ? "bg-[#FF6C37]" : "bg-[#E4E2E2]"

@@ -126,7 +126,7 @@ export default function TestRunsPage() {
                         </span>
                       </td>
                       <td className="py-3.5 font-mono">
-                        {run.overall_score !== undefined ? (
+                        {typeof run.overall_score === "number" && !isNaN(run.overall_score) ? (
                           <span className="font-bold text-slate-100 text-sm">
                             {run.overall_score.toFixed(1)} / 100
                           </span>

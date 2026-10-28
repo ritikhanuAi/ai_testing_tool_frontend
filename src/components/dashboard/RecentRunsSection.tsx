@@ -18,9 +18,10 @@ export interface TestRunItem {
   id: string;
   name: string;
   targetUrl: string;
-  status: "passed" | "running" | "failed" | "pending";
-  duration: string;
-  executedAt: string;
+  status: "passed" | "running" | "failed" | "pending" | "completed" | "queued" | "cancelled" | string;
+  duration?: string;
+  score?: number | null;
+  executedAt?: string;
 }
 
 interface RecentRunsSectionProps {
@@ -37,7 +38,7 @@ export function RecentRunsSection({
   onImportCases,
 }: RecentRunsSectionProps) {
   const activeRunsCount = runs.filter(
-    (r) => r.status === "running" || r.status === "pending"
+    (r) => r.status === "running" || r.status === "pending" || r.status === "queued"
   ).length;
 
   return (
@@ -84,24 +85,14 @@ export function RecentRunsSection({
               Trigger your first automated run via direct URL crawl or by uploading a suite of test cases above.
             </p>
             <div className="flex items-center gap-2.5">
-              {onLaunchWebsiteTest ? (
-                <button
-                  type="button"
-                  onClick={onLaunchWebsiteTest}
-                  className="h-8 px-3.5 rounded-lg bg-[#FF6C37] hover:bg-[#E8590C] text-white text-xs font-medium transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                >
-                  <Play className="w-3 h-3 fill-current" />
-                  <span>Test a Website</span>
-                </button>
-              ) : (
-                <Link
-                  href="/websites"
-                  className="h-8 px-3.5 rounded-lg bg-[#FF6C37] hover:bg-[#E8590C] text-white text-xs font-medium transition-colors inline-flex items-center gap-1.5 shadow-xs"
-                >
-                  <Play className="w-3 h-3 fill-current" />
-                  <span>Test a Website</span>
-                </Link>
-              )}
+              <Link
+                href="/websites"
+                onClick={onLaunchWebsiteTest}
+                className="h-8 px-3.5 rounded-lg bg-[#FF6C37] hover:bg-[#E8590C] text-white text-xs font-medium transition-colors inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Play className="w-3 h-3 fill-current" />
+                <span>Test a Website</span>
+              </Link>
 
               {onImportCases ? (
                 <button
@@ -139,73 +130,94 @@ export function RecentRunsSection({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E6E6E6]">
-              {runs.map((run) => (
-                <tr
-                  key={run.id}
-                  className="hover:bg-[#FBF9F8] transition-colors group"
-                >
-                  <td className="py-2.5 px-3.5">
-                    <div className="flex items-center gap-2">
-                      {run.status === "passed" && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#12B76A] shrink-0" />
+              {runs.map((run) => {
+                const isPassedOrCompleted = run.status === "passed" || run.status === "completed";
+                const isFailed = run.status === "failed";
+                const isRunning = run.status === "running";
+                const isPendingOrQueued = run.status === "pending" || run.status === "queued";
+                const isCancelled = run.status === "cancelled";
+
+                return (
+                  <tr
+                    key={run.id}
+                    className="hover:bg-[#FBF9F8] transition-colors group"
+                  >
+                    <td className="py-2.5 px-3.5">
+                      <div className="flex items-center gap-2">
+                        {isPassedOrCompleted && (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#12B76A] shrink-0" />
+                        )}
+                        {isFailed && (
+                          <AlertCircle className="w-3.5 h-3.5 text-[#F04438] shrink-0" />
+                        )}
+                        {isRunning && (
+                          <Loader2 className="w-3.5 h-3.5 text-[#006492] animate-spin shrink-0" />
+                        )}
+                        {isPendingOrQueued && (
+                          <span className="w-2 h-2 rounded-full bg-[#F79009] shrink-0 animate-pulse" />
+                        )}
+                        {isCancelled && (
+                          <span className="w-2 h-2 rounded-full bg-[#8C8C8C] shrink-0" />
+                        )}
+                        <span className="font-medium text-[#212121]">{run.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3.5">
+                      <span className="font-mono text-[11px] text-[#594139] bg-[#F5F3F3] px-2 py-0.5 rounded border border-[#E6E6E6] truncate max-w-[220px] inline-block align-middle">
+                        {run.targetUrl}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3.5">
+                      {isPassedOrCompleted && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#ECFDF3] text-[#006D3C] border border-[#006D3C]/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#12B76A]" />
+                          Completed
+                        </span>
                       )}
-                      {run.status === "failed" && (
-                        <AlertCircle className="w-3.5 h-3.5 text-[#F04438] shrink-0" />
+                      {isRunning && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#F0F9FF] text-[#004667] border border-[#006492]/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#006492] animate-pulse" />
+                          Running
+                        </span>
                       )}
-                      {run.status === "running" && (
-                        <Loader2 className="w-3.5 h-3.5 text-[#006492] animate-spin shrink-0" />
+                      {isFailed && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FEF3F2] text-[#93000A] border border-[#BA1A1A]/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#F04438]" />
+                          Failed
+                        </span>
                       )}
-                      <span className="font-medium text-[#212121]">{run.name}</span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3.5">
-                    <span className="font-mono text-[11px] text-[#594139] bg-[#F5F3F3] px-2 py-0.5 rounded border border-[#E6E6E6]">
-                      {run.targetUrl}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3.5">
-                    {run.status === "passed" && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#ECFDF3] text-[#006D3C] border border-[#006D3C]/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#12B76A]" />
-                        Passed
-                      </span>
-                    )}
-                    {run.status === "running" && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#F0F9FF] text-[#004667] border border-[#006492]/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#006492] animate-pulse" />
-                        Running
-                      </span>
-                    )}
-                    {run.status === "failed" && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FEF3F2] text-[#93000A] border border-[#BA1A1A]/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#F04438]" />
-                        Failed
-                      </span>
-                    )}
-                    {run.status === "pending" && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFAEB] text-[#7A3E00] border border-[#F79009]/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#F79009]" />
-                        Pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2.5 px-3.5 font-mono text-[#594139]">
-                    {run.duration || "--"}
-                  </td>
-                  <td className="py-2.5 px-3.5 text-[#6B6B6B]">
-                    {run.executedAt ? formatDate(run.executedAt) : "--"}
-                  </td>
-                  <td className="py-2.5 px-3.5 text-right">
-                    <Link
-                      href={`/test-runs/${run.id}`}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#F5F3F3] text-[#6B6B6B] hover:text-[#212121] transition-all inline-block"
-                      title="Inspect Run"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+                      {isPendingOrQueued && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FFFAEB] text-[#7A3E00] border border-[#F79009]/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#F79009]" />
+                          {run.status === "queued" ? "Queued" : "Pending"}
+                        </span>
+                      )}
+                      {isCancelled && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#F5F3F3] text-[#6B6B6B] border border-[#E6E6E6]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#8C8C8C]" />
+                          Cancelled
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3.5 font-mono text-[#594139]">
+                      {run.duration || "--"}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-[#6B6B6B]">
+                      {run.executedAt ? formatDate(run.executedAt) : "--"}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-right">
+                      <Link
+                        href={isPassedOrCompleted ? `/reports/${run.id}` : `/test-runs/${run.id}`}
+                        className="p-1 rounded hover:bg-[#F5F3F3] text-[#6B6B6B] hover:text-[#212121] transition-all inline-flex items-center gap-1 text-[11px] font-medium"
+                        title={isPassedOrCompleted ? "View Report" : "Inspect Run"}
+                      >
+                        <span>{isPassedOrCompleted ? "Report" : "Inspect"}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
