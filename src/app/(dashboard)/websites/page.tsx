@@ -31,7 +31,7 @@ export default function WebsiteTestingPage() {
 
   // Target URL & Protocol State
   const [protocol, setProtocol] = useState<"https://" | "http://">("https://");
-  const [domainPath, setDomainPath] = useState("example.com");
+  const [domainPath, setDomainPath] = useState("");
   const [siteLabel, setSiteLabel] = useState("");
   const [urlError, setUrlError] = useState("");
 
@@ -313,7 +313,7 @@ export default function WebsiteTestingPage() {
 
   const handleReset = () => {
     setProtocol("https://");
-    setDomainPath("example.com");
+    setDomainPath("");
     setSiteLabel("");
     setUrlError("");
     setPillarError("");

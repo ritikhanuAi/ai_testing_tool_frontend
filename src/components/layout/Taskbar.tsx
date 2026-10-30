@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Play } from "lucide-react";
 import { QuickScanModal } from "@/components/dashboard/QuickScanModal";
 
@@ -17,6 +18,7 @@ export function Taskbar({
   onSearch,
   onNewRun,
 }: TaskbarProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -29,7 +31,7 @@ export function Taskbar({
     if (onNewRun) {
       onNewRun();
     } else {
-      setIsModalOpen(true);
+      router.push("/websites");
     }
   };
 

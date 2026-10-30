@@ -90,7 +90,7 @@ export function UrlProtocolInput({
             required
             value={domainPath}
             onChange={onDomainChange}
-            placeholder="example.com or sub.domain.io/path"
+            placeholder="example.com"
             className="w-full h-10 pl-9 pr-3 bg-white text-sm text-[#212121] placeholder-[#8C8C8C] focus:outline-none"
           />
         </div>

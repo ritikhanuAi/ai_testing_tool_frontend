@@ -39,7 +39,7 @@ export function ScoreGauge({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#1e293b"
+          stroke="#F0EDE9"
           strokeWidth={strokeWidth}
           fill="transparent"
         />
@@ -61,12 +61,12 @@ export function ScoreGauge({
       </svg>
       {/* Centered Score Text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-extrabold text-slate-100 tracking-tight">
+        <span className="text-3xl font-extrabold text-[#212121] tracking-tight">
           {clampedScore.toFixed(1)}
         </span>
-        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">/ 100</span>
+        <span className="text-[10px] uppercase font-bold text-[#8C8C8C] tracking-wider">/ 100</span>
       </div>
-      {label && <p className="text-xs text-slate-400 mt-2 font-medium">{label}</p>}
+      {label && <p className="text-xs text-[#6B6B6B] mt-2 font-medium">{label}</p>}
     </div>
   );
 }

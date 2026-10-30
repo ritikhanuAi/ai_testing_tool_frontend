@@ -22,7 +22,7 @@ export function useTestRun(id: string) {
     refetchInterval: (query) => {
       const data = query.state.data as TestRunResponse | undefined;
       if (data && (data.status === "pending" || data.status === "running" || data.status === "queued")) {
-        return 2000;
+        return 10000;
       }
       return false;
     },
