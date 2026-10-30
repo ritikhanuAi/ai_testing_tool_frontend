@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/common/Modal";
-import { Select } from "@/components/common/Input";
+import { Select, Switch } from "@/components/common/Input";
 import { Button } from "@/components/common/Button";
 import { useWebsites } from "@/features/websites";
 import { useScanProfiles } from "@/features/scan-profiles";
@@ -27,6 +27,7 @@ export function QuickScanModal({ isOpen, onClose, defaultWebsiteId }: QuickScanM
   const [selectedWebsiteId, setSelectedWebsiteId] = useState<string>("");
   const [selectedProfileId, setSelectedProfileId] = useState<string>("");
   const [packId, setPackId] = useState<string>("");
+  const [headedBrowser, setHeadedBrowser] = useState(false);
 
   // Derive active selections: explicit user selection > default prop > catalog first item
   const activeWebsiteId =
@@ -43,6 +44,10 @@ export function QuickScanModal({ isOpen, onClose, defaultWebsiteId }: QuickScanM
         website_id: activeWebsiteId,
         scan_profile_id: activeProfileId || undefined,
         test_pack_id: packId || undefined,
+        advanced_options: {
+          headless: !headedBrowser,
+          slow_mo_ms: headedBrowser ? 300 : 0,
+        },
       });
       onClose();
       router.push(`/test-runs/${run.id}`);
@@ -103,10 +108,20 @@ export function QuickScanModal({ isOpen, onClose, defaultWebsiteId }: QuickScanM
           helperText="Executes YAML synthetic Playwright browser workflows during the functional pillar."
         />
 
+        <div className="pt-2 border-t border-slate-800/80">
+          <Switch
+            id="quick-scan-headed-browser"
+            checked={headedBrowser}
+            onChange={setHeadedBrowser}
+            label="Live Browser View (Headed Mode)"
+            description="Opens a visible Chromium window on your desktop to watch Playwright execute test steps in real-time."
+          />
+        </div>
+
         <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-3 mt-4">
           <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
           <p className="text-xs text-indigo-300 leading-relaxed">
-            Upon trigger, the engine spins up headless Chromium with Playwright, runs security header and exposure probes, evaluates Core Web Vitals telemetry, and assesses WCAG 2.1 AA rules.
+            Upon trigger, the engine spins up Playwright ({headedBrowser ? "live visible Chromium window" : "headless Chromium"}), runs security header and exposure probes, evaluates Core Web Vitals telemetry, and assesses WCAG 2.1 AA rules.
           </p>
         </div>
 

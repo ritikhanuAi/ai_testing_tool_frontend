@@ -35,6 +35,8 @@ interface AdvancedExecutionAccordionProps {
   setRecordTrace: (val: boolean) => void;
   recordVideo: boolean;
   setRecordVideo: (val: boolean) => void;
+  headedBrowser?: boolean;
+  setHeadedBrowser?: (val: boolean) => void;
 }
 
 export function AdvancedExecutionAccordion({
@@ -66,6 +68,8 @@ export function AdvancedExecutionAccordion({
   setRecordTrace,
   recordVideo,
   setRecordVideo,
+  headedBrowser = false,
+  setHeadedBrowser = () => {},
 }: AdvancedExecutionAccordionProps) {
   return (
     <div className="pt-1">
@@ -273,7 +277,7 @@ export function AdvancedExecutionAccordion({
           </div>
 
           {/* Part 4: Diagnostics & Tracing */}
-          <div className="pt-2 border-t border-[#E6E6E6] grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="pt-2 border-t border-[#E6E6E6] grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Switch
               label="Record Playwright Trace (trace.zip)"
               description="Saves full step-by-step DOM snapshots and action replays."
@@ -285,6 +289,12 @@ export function AdvancedExecutionAccordion({
               description="Captures full video stream of browser execution."
               checked={recordVideo}
               onChange={setRecordVideo}
+            />
+            <Switch
+              label="Live Browser View (Headed Mode)"
+              description="Opens a visible desktop Chromium window to observe test execution live."
+              checked={headedBrowser}
+              onChange={setHeadedBrowser}
             />
           </div>
         </div>

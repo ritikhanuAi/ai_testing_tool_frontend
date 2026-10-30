@@ -20,6 +20,8 @@ export interface AdvancedExecutionOptions {
   is_mobile?: boolean;
   record_trace?: boolean;
   record_video?: boolean;
+  headless?: boolean;
+  slow_mo_ms?: number;
   allow_state_changing?: boolean;
   rate_limit_rps?: number;
   timeout_seconds?: number;
@@ -41,6 +43,7 @@ export interface TriggerScanRequest {
   website_id: string;
   scan_profile_id?: string;
   test_pack_id?: string;
+  advanced_options?: AdvancedExecutionOptions;
 }
 
 export interface TestRunResponse {
@@ -77,4 +80,22 @@ export interface WebsiteAnalyzeResponse {
   credentials_requirement: CredentialRequirementInfo;
   recommended_options: AdvancedExecutionOptions;
   ready_quick_scan_payload: QuickScanRequest;
+}
+
+export interface RunLogEntry {
+  timestamp: string;
+  level: 'INFO' | 'WARNING' | 'ERROR';
+  stage: string;
+  message: string;
+  progress: number;
+}
+
+export interface RunLogsResponse {
+  run_id: string;
+  stage: string;
+  progress: number;
+  message: string;
+  updated_at?: string | null;
+  logs_count: number;
+  logs: RunLogEntry[];
 }

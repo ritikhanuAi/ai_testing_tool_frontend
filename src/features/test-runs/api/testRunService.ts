@@ -8,6 +8,7 @@ import {
   TriggerScanRequest,
   QuickScanRequest,
   WebsiteAnalyzeResponse,
+  RunLogsResponse,
 } from "@/types/test-run";
 
 export async function getTestRuns(): Promise<TestRunResponse[]> {
@@ -58,6 +59,13 @@ export async function cancelScan(id: string): Promise<TestRunResponse> {
   if (API_CONFIG.useMock) return mockStore.cancelScan(id);
   const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
     TEST_RUN_ENDPOINTS.CANCEL(id)
+  );
+  return res.data.data;
+}
+
+export async function getRunLogs(id: string): Promise<RunLogsResponse> {
+  const res = await axiosClient.get<ResponseEnvelope<RunLogsResponse>>(
+    TEST_RUN_ENDPOINTS.LOGS(id)
   );
   return res.data.data;
 }

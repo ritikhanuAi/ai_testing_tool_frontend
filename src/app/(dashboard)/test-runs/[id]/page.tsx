@@ -236,10 +236,12 @@ function TestRunMonitorContent() {
       <TestRunPillarPipeline
         isCompleted={isCompleted}
         isRunning={isRunning}
+        profile={profile}
       />
 
       {/* Terminal Live Trace Console */}
       <TestRunTerminalStream
+        runId={run.id}
         startedAt={run.started_at}
         targetUrl={site?.base_url || run.website_id}
         profileName={profile?.name}

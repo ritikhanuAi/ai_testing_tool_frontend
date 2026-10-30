@@ -70,3 +70,12 @@ export function useCancelScan() {
     },
   });
 }
+
+export function useRunLogs(id: string, isRunning: boolean) {
+  return useQuery({
+    queryKey: ["test-run-logs", id],
+    queryFn: () => testRunService.getRunLogs(id),
+    enabled: !!id,
+    refetchInterval: isRunning ? 1500 : false,
+  });
+}

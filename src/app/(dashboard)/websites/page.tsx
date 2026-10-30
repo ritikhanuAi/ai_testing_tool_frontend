@@ -66,6 +66,7 @@ export default function WebsiteTestingPage() {
   const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [recordTrace, setRecordTrace] = useState(true);
   const [recordVideo, setRecordVideo] = useState(false);
+  const [headedBrowser, setHeadedBrowser] = useState(false);
 
   // AI Intelligence Options State
   const [useAiGeneration, setUseAiGeneration] = useState(true);
@@ -276,6 +277,8 @@ export default function WebsiteTestingPage() {
           is_mobile: viewportProfile === "mobile",
           record_trace: recordTrace,
           record_video: recordVideo,
+          headless: !headedBrowser,
+          slow_mo_ms: headedBrowser ? 300 : 0,
           allow_state_changing: !readOnlyMode,
           rate_limit_rps: rateLimitRps || 10,
           timeout_seconds: parseInt(timeoutSeconds, 10) || 120,
@@ -567,6 +570,8 @@ export default function WebsiteTestingPage() {
                 setRecordTrace={setRecordTrace}
                 recordVideo={recordVideo}
                 setRecordVideo={setRecordVideo}
+                headedBrowser={headedBrowser}
+                setHeadedBrowser={setHeadedBrowser}
               />
 
               {/* Action Buttons */}

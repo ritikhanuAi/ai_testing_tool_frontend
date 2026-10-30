@@ -58,6 +58,19 @@ export default function ReportDetailPage() {
   }
 
   const allFindings: PillarFinding[] = report.report_data.all_findings || [];
+  const pillarResults = report.report_data?.pillar_results || {};
+  const effectiveWeights = report.report_data?.effective_pillar_weights || {};
+  const executedTestCases = report.report_data?.test_cases || [];
+
+  const isFunctionalSkipped = pillarResults.functional?.status === "SKIPPED";
+  const isSecuritySkipped = pillarResults.security?.status === "SKIPPED";
+  const isPerformanceSkipped = pillarResults.performance?.status === "SKIPPED";
+  const isAccessibilitySkipped = pillarResults.accessibility?.status === "SKIPPED";
+
+  const funcWeight = effectiveWeights.functional != null ? `${Math.round(effectiveWeights.functional * 100)}%` : (isFunctionalSkipped ? "Excluded" : "35%");
+  const secWeight = effectiveWeights.security != null ? `${Math.round(effectiveWeights.security * 100)}%` : (isSecuritySkipped ? "Excluded" : "25%");
+  const perfWeight = effectiveWeights.performance != null ? `${Math.round(effectiveWeights.performance * 100)}%` : (isPerformanceSkipped ? "Excluded" : "20%");
+  const a11yWeight = effectiveWeights.accessibility != null ? `${Math.round(effectiveWeights.accessibility * 100)}%` : (isAccessibilitySkipped ? "Excluded" : "20%");
 
   const filteredFindings = allFindings.filter((f) => {
     if (severityFilter !== "all" && f.severity !== severityFilter) return false;
@@ -202,86 +215,86 @@ export default function ReportDetailPage() {
       {/* 4-Pillar Score Cards Breakdown */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Pillar 1: Functional */}
-        <Card hoverable className="border-t-4 border-t-[#175CD3] bg-white">
+        <Card hoverable className={`border-t-4 ${isFunctionalSkipped ? 'border-t-[#8C8C8C] bg-[#FAFAFA] opacity-75' : 'border-t-[#175CD3] bg-white'}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#175CD3]">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isFunctionalSkipped ? 'text-[#8C8C8C]' : 'text-[#175CD3]'}`}>
               Functional
             </span>
-            <div className="p-1.5 rounded-lg bg-[#EFF8FF] text-[#175CD3]">
+            <div className={`p-1.5 rounded-lg ${isFunctionalSkipped ? 'bg-[#F0F0F0] text-[#8C8C8C]' : 'bg-[#EFF8FF] text-[#175CD3]'}`}>
               <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#212121]">
-              {report.functional_score.toFixed(1)}%
+            <span className={`text-2xl font-bold ${isFunctionalSkipped ? 'text-[#8C8C8C]' : 'text-[#212121]'}`}>
+              {isFunctionalSkipped ? "SKIPPED" : `${report.functional_score.toFixed(1)}%`}
             </span>
-            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: 35%</span>
+            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: {funcWeight}</span>
           </div>
           <p className="text-[11px] text-[#6B6B6B] mt-2">
-            Synthetic Playwright actions, selector workflows, and assertions
+            {isFunctionalSkipped ? "Pillar disabled in scan profile" : "Synthetic Playwright actions, selector workflows, and assertions"}
           </p>
         </Card>
 
         {/* Pillar 2: Security */}
-        <Card hoverable className="border-t-4 border-t-[#027A48] bg-white">
+        <Card hoverable className={`border-t-4 ${isSecuritySkipped ? 'border-t-[#8C8C8C] bg-[#FAFAFA] opacity-75' : 'border-t-[#027A48] bg-white'}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#027A48]">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isSecuritySkipped ? 'text-[#8C8C8C]' : 'text-[#027A48]'}`}>
               Security
             </span>
-            <div className="p-1.5 rounded-lg bg-[#ECFDF3] text-[#027A48]">
+            <div className={`p-1.5 rounded-lg ${isSecuritySkipped ? 'bg-[#F0F0F0] text-[#8C8C8C]' : 'bg-[#ECFDF3] text-[#027A48]'}`}>
               <Shield className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#212121]">
-              {report.security_score.toFixed(1)}%
+            <span className={`text-2xl font-bold ${isSecuritySkipped ? 'text-[#8C8C8C]' : 'text-[#212121]'}`}>
+              {isSecuritySkipped ? "SKIPPED" : `${report.security_score.toFixed(1)}%`}
             </span>
-            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: 25%</span>
+            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: {secWeight}</span>
           </div>
           <p className="text-[11px] text-[#6B6B6B] mt-2">
-            OWASP header hardening, TLS grade, and exposure probes
+            {isSecuritySkipped ? "Pillar disabled in scan profile" : "OWASP header hardening, TLS grade, and exposure probes"}
           </p>
         </Card>
 
         {/* Pillar 3: Performance */}
-        <Card hoverable className="border-t-4 border-t-[#C11574] bg-white">
+        <Card hoverable className={`border-t-4 ${isPerformanceSkipped ? 'border-t-[#8C8C8C] bg-[#FAFAFA] opacity-75' : 'border-t-[#C11574] bg-white'}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#C11574]">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isPerformanceSkipped ? 'text-[#8C8C8C]' : 'text-[#C11574]'}`}>
               Performance
             </span>
-            <div className="p-1.5 rounded-lg bg-[#FDF4FF] text-[#C11574]">
+            <div className={`p-1.5 rounded-lg ${isPerformanceSkipped ? 'bg-[#F0F0F0] text-[#8C8C8C]' : 'bg-[#FDF4FF] text-[#C11574]'}`}>
               <Zap className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#212121]">
-              {report.performance_score.toFixed(1)}%
+            <span className={`text-2xl font-bold ${isPerformanceSkipped ? 'text-[#8C8C8C]' : 'text-[#212121]'}`}>
+              {isPerformanceSkipped ? "SKIPPED" : `${report.performance_score.toFixed(1)}%`}
             </span>
-            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: 20%</span>
+            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: {perfWeight}</span>
           </div>
           <p className="text-[11px] text-[#6B6B6B] mt-2">
-            Core Web Vitals telemetry: TTFB, LCP, CLS, and FID metrics
+            {isPerformanceSkipped ? "Pillar disabled in scan profile" : "Core Web Vitals telemetry: TTFB, LCP, CLS, and FID metrics"}
           </p>
         </Card>
 
         {/* Pillar 4: Accessibility */}
-        <Card hoverable className="border-t-4 border-t-[#FF6C37] bg-white">
+        <Card hoverable className={`border-t-4 ${isAccessibilitySkipped ? 'border-t-[#8C8C8C] bg-[#FAFAFA] opacity-75' : 'border-t-[#FF6C37] bg-white'}`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6C37]">
+            <span className={`text-xs font-bold uppercase tracking-wider ${isAccessibilitySkipped ? 'text-[#8C8C8C]' : 'text-[#FF6C37]'}`}>
               Accessibility
             </span>
-            <div className="p-1.5 rounded-lg bg-[#FFF1EB] text-[#FF6C37]">
+            <div className={`p-1.5 rounded-lg ${isAccessibilitySkipped ? 'bg-[#F0F0F0] text-[#8C8C8C]' : 'bg-[#FFF1EB] text-[#FF6C37]'}`}>
               <Activity className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#212121]">
-              {report.accessibility_score.toFixed(1)}%
+            <span className={`text-2xl font-bold ${isAccessibilitySkipped ? 'text-[#8C8C8C]' : 'text-[#212121]'}`}>
+              {isAccessibilitySkipped ? "SKIPPED" : `${report.accessibility_score.toFixed(1)}%`}
             </span>
-            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: 20%</span>
+            <span className="text-[10px] text-[#8C8C8C] uppercase font-semibold">Weight: {a11yWeight}</span>
           </div>
           <p className="text-[11px] text-[#6B6B6B] mt-2">
-            Automated WCAG 2.1 AA Axe checks, color contrast, and ARIA tags
+            {isAccessibilitySkipped ? "Pillar disabled in scan profile" : "Automated WCAG 2.1 AA Axe checks, color contrast, and ARIA tags"}
           </p>
         </Card>
       </div>
@@ -303,6 +316,69 @@ export default function ReportDetailPage() {
           </p>
         </div>
       </div>
+
+      {/* Executed AI & Synthetic Test Cases */}
+      {executedTestCases.length > 0 && (
+        <Card className="p-0 overflow-hidden bg-white border border-[#E6E6E6] rounded-xl shadow-xs">
+          <div className="p-5 border-b border-[#E6E6E6] flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-[#212121] tracking-tight">
+                Executed AI & Synthetic Test Cases
+              </h3>
+              <p className="text-xs text-[#6B6B6B] mt-0.5">
+                {executedTestCases.length} browser scenario(s) synthesized and executed by Playwright
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ECFDF3] text-[#12B76A] border border-[#12B76A]/30">
+              {executedTestCases.filter((c: any) => c.passed).length} / {executedTestCases.length} Passed
+            </span>
+          </div>
+
+          <div className="divide-y divide-[#E6E6E6]">
+            {executedTestCases.map((tc: any, idx: number) => (
+              <div key={idx} className="p-4 hover:bg-[#FAFAFA] transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-[#FF6C37] bg-[#FFF1EB] px-2 py-0.5 rounded border border-[#FF6C37]/30">
+                      {tc.id}
+                    </span>
+                    <span className="text-sm font-semibold text-[#212121]">{tc.title}</span>
+                  </div>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase ${
+                      tc.passed
+                        ? "bg-[#ECFDF3] text-[#027A48] border border-[#12B76A]/30"
+                        : "bg-[#FEF3F2] text-[#B42318] border border-[#F04438]/30"
+                    }`}
+                  >
+                    {tc.passed ? "PASSED" : "FAILED"}
+                  </span>
+                </div>
+
+                {/* Steps List */}
+                {tc.steps && tc.steps.length > 0 && (
+                  <div className="mt-2.5 space-y-1 bg-[#F8F9FA] rounded-lg p-2.5 border border-[#E6E6E6] font-mono text-[11px]">
+                    <span className="text-[10px] uppercase font-bold text-[#8C8C8C] block mb-1">
+                      Playwright Actions ({tc.steps.length} steps):
+                    </span>
+                    {tc.steps.map((st: any, sIdx: number) => (
+                      <div key={sIdx} className="flex items-center gap-2 text-[#594139]">
+                        <span className="text-[#8C8C8C] select-none">{sIdx + 1}.</span>
+                        <span className="font-semibold text-[#212121]">{st.action}</span>
+                        {st.target && <span className="text-[#175CD3]">{st.target}</span>}
+                        {st.value && <span className="text-[#027A48]">➔ &quot;{st.value}&quot;</span>}
+                        <span className={`ml-auto text-[10px] ${st.status === "FAILED" ? "text-[#B42318] font-bold" : "text-[#12B76A]"}`}>
+                          {st.status || "PASSED"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Findings Section */}
       <Card className="p-0 overflow-hidden bg-white border border-[#E6E6E6] rounded-xl">
