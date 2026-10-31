@@ -9,7 +9,7 @@ import { GradeBadge } from "@/components/common/GradeBadge";
 import { ScoreGauge } from "@/components/common/ScoreGauge";
 import { SeverityPill } from "@/components/common/SeverityPill";
 import { FindingDetailModal } from "@/components/reports/FindingDetailModal";
-import { useReportSummary } from "@/features/reports";
+import { useReportSummary, reportService } from "@/features/reports";
 import { useTestRun } from "@/features/test-runs";
 import { PillarFinding } from "@/types/report";
 import { formatDate } from "@/lib/utils";
@@ -24,6 +24,7 @@ import {
   Search,
   Sparkles,
   ChevronRight,
+  FileSpreadsheet,
 } from "lucide-react";
 
 export default function ReportDetailPage() {
@@ -36,6 +37,20 @@ export default function ReportDetailPage() {
   const [selectedFinding, setSelectedFinding] = useState<PillarFinding | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      await reportService.downloadReportExcel(runId);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Excel export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -118,6 +133,15 @@ export default function ReportDetailPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {exportError && (
+            <span className="text-xs text-[#B42318]" role="alert">
+              {exportError}
+            </span>
+          )}
+          <Button variant="primary" size="sm" onClick={handleExportExcel} isLoading={isExporting}>
+            <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+            Export to Excel
+          </Button>
           <Link href="/test-runs">
             <Button variant="outline" size="sm">
               Scan History
