@@ -444,9 +444,9 @@ export default function ReportDetailPage() {
                   </td>
                 </tr>
               ) : (
-                filteredFindings.map((finding) => (
+                filteredFindings.map((finding, index) => (
                   <tr
-                    key={finding.id}
+                    key={`${finding.id}-${finding.selector_or_url ?? ""}-${index}`}
                     onClick={() => setSelectedFinding(finding)}
                     className="hover:bg-[#F9F8F7] cursor-pointer transition-colors"
                   >

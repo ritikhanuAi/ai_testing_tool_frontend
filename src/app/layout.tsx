@@ -26,11 +26,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
+    <html suppressHydrationWarning
       lang="en"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#FBF9F8] text-[#212121] font-sans selection:bg-[#FFF1EB] selection:text-[#FF6C37]">
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-[#FBF9F8] text-[#212121] font-sans selection:bg-[#FFF1EB] selection:text-[#FF6C37]">
         <Providers>{children}</Providers>
       </body>
     </html>
