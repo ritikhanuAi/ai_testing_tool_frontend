@@ -35,7 +35,7 @@ export default function ReportsHubPage() {
 
   // Runs that have an audit report available (completed or runs with an overall_score)
   const reportRuns = useMemo(() => {
-    return runs.filter((r) => r.status === "completed" || r.overall_score !== undefined);
+    return runs.filter((r) => r.status === "completed" || r.overall_score != null);
   }, [runs]);
 
   // Aggregate Metrics
@@ -298,7 +298,7 @@ export default function ReportsHubPage() {
                           <GradeBadge grade={run.grade || (isPassed ? "A" : "C")} size="sm" />
                           <div className="flex flex-col">
                             <span className="font-mono text-sm font-bold text-[#212121]">
-                              {run.overall_score !== undefined
+                              {run.overall_score != null
                                 ? `${run.overall_score.toFixed(1)}/100`
                                 : "Pending"}
                             </span>

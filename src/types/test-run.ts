@@ -53,7 +53,7 @@ export interface TestRunResponse {
   test_pack_id?: string;
   status: RunStatus;
   celery_task_id?: string;
-  overall_score?: number;
+  overall_score?: number | null;
   grade?: string;
   started_at?: string;
   completed_at?: string;

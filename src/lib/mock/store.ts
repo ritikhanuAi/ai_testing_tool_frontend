@@ -298,7 +298,7 @@ class MockStore {
   // --- DASHBOARD ---
   async getDashboardSummary(): Promise<DashboardSummaryResponse> {
     await this.delay();
-    const completedRuns = this.testRuns.filter((r) => r.status === "completed" && r.overall_score !== undefined);
+    const completedRuns = this.testRuns.filter((r) => r.status === "completed" && r.overall_score != null);
     const avgScore =
       completedRuns.length > 0
         ? Number((completedRuns.reduce((sum, r) => sum + (r.overall_score || 0), 0) / completedRuns.length).toFixed(1))
@@ -334,7 +334,7 @@ class MockStore {
         website_name: site?.name || "Unknown Target",
         target_url: site?.base_url || "https://example.com",
         status: run.status,
-        score: run.overall_score,
+        score: run.overall_score ?? undefined,
         started_at: run.started_at || new Date().toISOString(),
         finished_at: run.completed_at,
       };
