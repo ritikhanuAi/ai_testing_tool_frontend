@@ -10,6 +10,8 @@ import {
   CustomScanRequest,
   WebsiteAnalyzeResponse,
   RunLogsResponse,
+  DiscoverModulesRequest,
+  DiscoverModulesResponse,
 } from "@/types/test-run";
 
 export async function getTestRuns(): Promise<TestRunResponse[]> {
@@ -70,6 +72,17 @@ export async function cancelScan(id: string): Promise<TestRunResponse> {
   if (API_CONFIG.useMock) return mockStore.cancelScan(id);
   const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
     TEST_RUN_ENDPOINTS.CANCEL(id)
+  );
+  return res.data.data;
+}
+
+export async function discoverModules(
+  payload: DiscoverModulesRequest
+): Promise<DiscoverModulesResponse> {
+  const res = await axiosClient.post<ResponseEnvelope<DiscoverModulesResponse>>(
+    TEST_RUN_ENDPOINTS.DISCOVER_MODULES,
+    payload,
+    { timeout: 130000 }
   );
   return res.data.data;
 }

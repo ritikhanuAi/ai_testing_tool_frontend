@@ -7,4 +7,5 @@ export const TEST_RUN_ENDPOINTS = {
   DETAIL: (id: string) => `/test-runs/${id}`,
   CANCEL: (id: string) => `/test-runs/${id}/cancel`,
   LOGS: (id: string) => `/test-runs/${id}/logs`,
+  DISCOVER_MODULES: "/test-runs/discover-modules",
 } as const;

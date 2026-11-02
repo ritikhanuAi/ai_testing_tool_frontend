@@ -110,3 +110,41 @@ export interface RunLogsResponse {
   logs_count: number;
   logs: RunLogEntry[];
 }
+
+// --- Module Discovery Types ---
+
+export interface DiscoverModulesRequest {
+  url: string;
+  credentials?: AuthenticationPayload;
+}
+
+export interface DiscoveredModule {
+  name: string;
+  url: string;
+  suggested_goal: string;
+  depth: number;
+}
+
+export interface DiscoverModulesResponse {
+  modules: DiscoveredModule[];
+  base_url: string;
+  discovery_time_ms: number;
+  total_discovered: number;
+}
+
+export type WizardModuleRow = DiscoveredModule & {
+  selected: boolean;
+  goal: string;
+};
+
+export type ModuleScanStatus = "pending" | "running" | "completed" | "failed";
+
+export interface ModuleScanResult {
+  moduleUrl: string;
+  moduleName: string;
+  runId: string | null;
+  status: ModuleScanStatus;
+  score?: number | null;
+  grade?: string;
+  errorMessage?: string;
+}

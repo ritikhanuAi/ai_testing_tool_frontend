@@ -6,6 +6,7 @@ import {
   QuickScanRequest,
   CustomScanRequest,
   WebsiteAnalyzeResponse,
+  DiscoverModulesRequest,
 } from "@/types/test-run";
 
 export function useTestRuns() {
@@ -72,6 +73,13 @@ export function useExecuteCustomScan() {
 export function useAnalyzeUrl() {
   return useMutation({
     mutationFn: (url: string) => testRunService.analyzeUrl(url),
+  });
+}
+
+export function useDiscoverModules() {
+  return useMutation({
+    mutationFn: (payload: DiscoverModulesRequest) =>
+      testRunService.discoverModules(payload),
   });
 }
 

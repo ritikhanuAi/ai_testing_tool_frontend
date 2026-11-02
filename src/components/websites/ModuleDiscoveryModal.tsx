@@ -1,0 +1,544 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search } from "lucide-react";
+import { Modal } from "@/components/common/Modal";
+import { AuthenticationDrawer } from "@/components/websites/AuthenticationDrawer";
+import { Button } from "@/components/common/Button";
+import * as testRunService from "@/features/test-runs/api/testRunService";
+import {
+  AuthenticationPayload,
+  WizardModuleRow,
+  ModuleScanResult,
+  ModuleScanStatus,
+  QuickScanRequest,
+} from "@/types/test-run";
+
+interface ModuleDiscoveryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  initialUrl?: string;
+}
+
+type WizardStep = 1 | 2 | 3 | 4 | 5;
+
+const STEP_LABELS = ["URL & Auth", "Modules", "Settings", "Running", "Results"];
+
+const GRADE_COLORS: Record<string, string> = {
+  A: "text-green-600 bg-green-50",
+  B: "text-blue-600 bg-blue-50",
+  C: "text-yellow-600 bg-yellow-50",
+  D: "text-orange-600 bg-orange-50",
+  F: "text-red-600 bg-red-50",
+};
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollUntilDone(runId: string, maxMs = 180_000) {
+  const interval = 5000;
+  const maxAttempts = Math.ceil(maxMs / interval);
+  for (let i = 0; i < maxAttempts; i++) {
+    await sleep(interval);
+    const run = await testRunService.getTestRun(runId);
+    if (["completed", "failed", "cancelled"].includes(run.status)) return run;
+  }
+  throw new Error("Scan timed out waiting for completion");
+}
+
+export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: ModuleDiscoveryModalProps) {
+  const [step, setStep] = useState<WizardStep>(1);
+
+  // Step 1 — URL + Auth
+  const [targetUrl, setTargetUrl] = useState(initialUrl);
+  const [authEnabled, setAuthEnabled] = useState(false);
+  const [authMethod, setAuthMethod] = useState<"form" | "basic_auth" | "storage_state">("form");
+  const [loginUrl, setLoginUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [successIndicator, setSuccessIndicator] = useState("");
+
+  // Step 2 — Discovery
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [moduleRows, setModuleRows] = useState<WizardModuleRow[]>([]);
+
+  // Step 3 — Scan settings
+  const [checkFunctional, setCheckFunctional] = useState(true);
+  const [checkSecurity, setCheckSecurity] = useState(true);
+  const [checkPerformance, setCheckPerformance] = useState(true);
+  const [checkAccessibility, setCheckAccessibility] = useState(true);
+  const [timeoutSeconds, setTimeoutSeconds] = useState("600");
+  const [maxDepth, setMaxDepth] = useState(5);
+  const [allowStateChanging, setAllowStateChanging] = useState(true);
+
+  // Step 4 — Execution
+  const [scanResults, setScanResults] = useState<ModuleScanResult[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const stopRef = useRef(false);
+
+  // Sync initialUrl when modal opens
+  useEffect(() => {
+    if (isOpen) setTargetUrl(initialUrl);
+  }, [isOpen, initialUrl]);
+
+  function resetWizard() {
+    setStep(1);
+    setTargetUrl(initialUrl);
+    setAuthEnabled(false);
+    setAuthMethod("form");
+    setLoginUrl("");
+    setUsername("");
+    setPassword("");
+    setShowPassword(false);
+    setSuccessIndicator("");
+    setIsDiscovering(false);
+    setDiscoveryError(null);
+    setModuleRows([]);
+    setScanResults([]);
+    setCurrentIndex(0);
+    stopRef.current = false;
+  }
+
+  function handleClose() {
+    stopRef.current = true;
+    onClose();
+    setTimeout(resetWizard, 300);
+  }
+
+  // ── Step 1 → Step 2: trigger discovery ──────────────────────────────────
+  async function handleDiscover() {
+    if (!targetUrl.trim()) return;
+    setDiscoveryError(null);
+    setIsDiscovering(true);
+    setStep(2);
+
+    const credentials: AuthenticationPayload | undefined = authEnabled
+      ? { enabled: true, login_url: loginUrl || undefined, username: username || undefined, password: password || undefined, auth_method: authMethod, success_indicator: successIndicator || undefined }
+      : undefined;
+
+    try {
+      const res = await testRunService.discoverModules({ url: targetUrl.trim(), credentials });
+      setModuleRows(
+        res.modules.map((m) => ({ ...m, selected: true, goal: m.suggested_goal }))
+      );
+    } catch (err) {
+      setDiscoveryError(err instanceof Error ? err.message : "Module discovery failed. Check the URL and credentials.");
+    } finally {
+      setIsDiscovering(false);
+    }
+  }
+
+  const selectedModules = moduleRows.filter((m) => m.selected);
+
+  function toggleAll(val: boolean) {
+    setModuleRows((rows) => rows.map((r) => ({ ...r, selected: val })));
+  }
+
+  function updateRow(idx: number, field: keyof WizardModuleRow, value: string | boolean) {
+    setModuleRows((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+  }
+
+  // ── Step 3 → Step 4: sequential scan execution ───────────────────────────
+  useEffect(() => {
+    if (step !== 4) return;
+    stopRef.current = false;
+
+    const selected = moduleRows.filter((m) => m.selected);
+    setScanResults(
+      selected.map((m) => ({ moduleUrl: m.url, moduleName: m.name, runId: null, status: "pending" as ModuleScanStatus }))
+    );
+
+    const credentials: AuthenticationPayload | undefined = authEnabled
+      ? { enabled: true, login_url: loginUrl || undefined, username: username || undefined, password: password || undefined, auth_method: authMethod, success_indicator: successIndicator || undefined }
+      : undefined;
+
+    const globalOptions = {
+      check_functional: checkFunctional,
+      check_security: checkSecurity,
+      check_performance: checkPerformance,
+      check_accessibility: checkAccessibility,
+      timeout_seconds: parseInt(timeoutSeconds, 10) || 600,
+      max_crawl_depth: maxDepth,
+      allow_state_changing: allowStateChanging,
+      use_ai_generation: true,
+      ai_explain_failures: true,
+      headless: true,
+      record_trace: true,
+    };
+
+    (async () => {
+      for (let i = 0; i < selected.length; i++) {
+        if (stopRef.current) break;
+        setCurrentIndex(i);
+        setScanResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "running" } : r));
+
+        const mod = selected[i];
+        const payload: QuickScanRequest = {
+          url: mod.url,
+          name: mod.name,
+          credentials,
+          options: { ...globalOptions, ai_test_goals: mod.goal },
+        };
+
+        try {
+          const run = await testRunService.quickScan(payload);
+          const final = await pollUntilDone(run.id, (parseInt(timeoutSeconds, 10) || 600) * 1000 + 30000);
+          setScanResults((prev) =>
+            prev.map((r, idx) =>
+              idx === i
+                ? { ...r, runId: final.id, status: final.status === "completed" ? "completed" : "failed", score: final.overall_score, grade: final.grade, errorMessage: final.error_message ?? undefined }
+                : r
+            )
+          );
+        } catch (err) {
+          setScanResults((prev) =>
+            prev.map((r, idx) =>
+              idx === i ? { ...r, status: "failed", errorMessage: err instanceof Error ? err.message : "Scan failed" } : r
+            )
+          );
+        }
+      }
+      setStep(5);
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // ── Rendering helpers ────────────────────────────────────────────────────
+  function StatusIcon({ status }: { status: ModuleScanStatus }) {
+    if (status === "pending") return <Clock className="w-4 h-4 text-gray-400" />;
+    if (status === "running") return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+    if (status === "completed") return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+    return <XCircle className="w-4 h-4 text-red-500" />;
+  }
+
+  // ── Pillar chip ──────────────────────────────────────────────────────────
+  function PillarChip({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+          checked ? "bg-[#FF6C37] text-white border-[#FF6C37]" : "bg-white text-[#6B6B6B] border-[#E6E6E6] hover:border-[#FF6C37]"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  const completedCount = scanResults.filter((r) => r.status === "completed").length;
+  const failedCount = scanResults.filter((r) => r.status === "failed").length;
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Discover & Scan Modules" maxWidth="4xl">
+      {/* Step indicator */}
+      <div className="flex items-center gap-0 mb-6">
+        {STEP_LABELS.map((label, i) => {
+          const n = (i + 1) as WizardStep;
+          const active = step === n;
+          const done = step > n;
+          return (
+            <React.Fragment key={n}>
+              <div className="flex flex-col items-center">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all ${
+                  done ? "bg-[#FF6C37] border-[#FF6C37] text-white" :
+                  active ? "bg-white border-[#FF6C37] text-[#FF6C37]" :
+                  "bg-white border-[#E6E6E6] text-[#8C8C8C]"
+                }`}>
+                  {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : n}
+                </div>
+                <span className={`mt-1 text-[10px] whitespace-nowrap ${active ? "text-[#FF6C37] font-medium" : "text-[#8C8C8C]"}`}>{label}</span>
+              </div>
+              {i < STEP_LABELS.length - 1 && (
+                <div className={`flex-1 h-0.5 mb-4 mx-1 ${step > n ? "bg-[#FF6C37]" : "bg-[#E6E6E6]"}`} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* ── Step 1: URL + Auth ─────────────────────────────────────────────── */}
+      {step === 1 && (
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-[#594139] mb-1">Target URL</label>
+            <input
+              type="url"
+              value={targetUrl}
+              onChange={(e) => setTargetUrl(e.target.value)}
+              placeholder="https://example.com/dashboard"
+              className="w-full h-9 px-3 rounded-lg bg-white border border-[#E6E6E6] text-sm text-[#212121] placeholder-[#8C8C8C] focus:outline-none focus:border-[#FF6C37]"
+            />
+          </div>
+          <AuthenticationDrawer
+            authEnabled={authEnabled} setAuthEnabled={setAuthEnabled}
+            authMethod={authMethod} setAuthMethod={setAuthMethod}
+            loginUrl={loginUrl} setLoginUrl={setLoginUrl}
+            username={username} setUsername={setUsername}
+            password={password} setPassword={setPassword}
+            showPassword={showPassword} setShowPassword={setShowPassword}
+            successIndicator={successIndicator} setSuccessIndicator={setSuccessIndicator}
+          />
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={handleDiscover}
+              disabled={!targetUrl.trim()}
+              rightIcon={<Search className="w-3.5 h-3.5" />}
+            >
+              Discover Modules
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Module discovery ───────────────────────────────────────── */}
+      {step === 2 && (
+        <div className="space-y-4">
+          {isDiscovering && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="w-8 h-8 text-[#FF6C37] animate-spin" />
+              <p className="text-sm text-[#6B6B6B]">Logging in and scanning navigation structure...</p>
+              <p className="text-xs text-[#8C8C8C]">This may take 20–40 seconds</p>
+            </div>
+          )}
+
+          {!isDiscovering && discoveryError && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{discoveryError}</div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
+                <Button onClick={handleDiscover} leftIcon={<RotateCcw className="w-3.5 h-3.5" />}>Try Again</Button>
+              </div>
+            </div>
+          )}
+
+          {!isDiscovering && !discoveryError && moduleRows.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#6B6B6B]">
+                  Found <span className="font-semibold text-[#212121]">{moduleRows.length}</span> modules.
+                  Edit names, URLs, or test goals inline.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => toggleAll(true)} className="text-xs text-[#FF6C37] hover:underline">Select All</button>
+                  <span className="text-[#E6E6E6]">|</span>
+                  <button onClick={() => toggleAll(false)} className="text-xs text-[#6B6B6B] hover:underline">Deselect All</button>
+                </div>
+              </div>
+
+              <div className="border border-[#E6E6E6] rounded-xl overflow-hidden">
+                <div className="grid grid-cols-[32px_1fr_1fr_2fr] gap-0 bg-[#F5F3F3] px-3 py-2 text-[10px] font-semibold text-[#6B6B6B] uppercase tracking-wide">
+                  <div />
+                  <div>Module</div>
+                  <div>URL</div>
+                  <div>AI Test Goal</div>
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-[#F5F3F3]">
+                  {moduleRows.map((row, idx) => (
+                    <div key={idx} className={`grid grid-cols-[32px_1fr_1fr_2fr] gap-0 px-3 py-2 items-center ${row.selected ? "bg-white" : "bg-[#FAFAFA] opacity-60"}`}>
+                      <input
+                        type="checkbox"
+                        checked={row.selected}
+                        onChange={(e) => updateRow(idx, "selected", e.target.checked)}
+                        className="w-4 h-4 accent-[#FF6C37]"
+                      />
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateRow(idx, "name", e.target.value)}
+                        className="text-xs text-[#212121] bg-transparent border-0 focus:outline-none focus:bg-[#FFF8F6] rounded px-1 py-0.5 w-full"
+                      />
+                      <input
+                        type="text"
+                        value={row.url}
+                        onChange={(e) => updateRow(idx, "url", e.target.value)}
+                        className="text-xs text-[#6B6B6B] bg-transparent border-0 focus:outline-none focus:bg-[#FFF8F6] rounded px-1 py-0.5 w-full font-mono truncate"
+                      />
+                      <input
+                        type="text"
+                        value={row.goal}
+                        onChange={(e) => updateRow(idx, "goal", e.target.value)}
+                        className="text-xs text-[#594139] bg-transparent border-0 focus:outline-none focus:bg-[#FFF8F6] rounded px-1 py-0.5 w-full"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-1">
+                <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
+                <Button
+                  onClick={() => setStep(3)}
+                  disabled={selectedModules.length === 0}
+                  rightIcon={<ChevronRight className="w-3.5 h-3.5" />}
+                >
+                  Continue with {selectedModules.length} selected
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Step 3: Scan settings ──────────────────────────────────────────── */}
+      {step === 3 && (
+        <div className="space-y-5">
+          <div>
+            <p className="text-xs font-semibold text-[#212121] mb-2">Quality Pillars</p>
+            <div className="flex flex-wrap gap-2">
+              <PillarChip label="Functional" checked={checkFunctional} onChange={setCheckFunctional} />
+              <PillarChip label="Security" checked={checkSecurity} onChange={setCheckSecurity} />
+              <PillarChip label="Performance" checked={checkPerformance} onChange={setCheckPerformance} />
+              <PillarChip label="Accessibility" checked={checkAccessibility} onChange={setCheckAccessibility} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-[11px] font-medium text-[#594139] mb-1">Timeout (sec)</label>
+              <input
+                type="number"
+                value={timeoutSeconds}
+                onChange={(e) => setTimeoutSeconds(e.target.value)}
+                min={120} max={1800}
+                className="w-full h-8 px-3 rounded-lg border border-[#E6E6E6] text-xs focus:outline-none focus:border-[#FF6C37]"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[#594139] mb-1">Max Depth</label>
+              <select
+                value={maxDepth}
+                onChange={(e) => setMaxDepth(Number(e.target.value))}
+                className="w-full h-8 px-2 rounded-lg border border-[#E6E6E6] text-xs focus:outline-none focus:border-[#FF6C37] bg-white"
+              >
+                {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{d} hop{d > 1 ? "s" : ""}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[#594139] mb-1">Allow State Changes</label>
+              <button
+                type="button"
+                onClick={() => setAllowStateChanging(!allowStateChanging)}
+                className={`w-full h-8 rounded-lg border text-xs font-medium transition-all ${allowStateChanging ? "bg-[#FF6C37] text-white border-[#FF6C37]" : "bg-white text-[#6B6B6B] border-[#E6E6E6]"}`}
+              >
+                {allowStateChanging ? "Enabled" : "Read-only"}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[#FFF8F6] border border-[#FFD5C8] rounded-lg px-4 py-3 text-xs text-[#594139]">
+            <strong>{selectedModules.length} modules</strong> will be scanned sequentially.
+            Estimated time: <strong>~{Math.round(selectedModules.length * (parseInt(timeoutSeconds) || 600) / 60)} min</strong> total.
+          </div>
+
+          <div className="flex justify-between pt-1">
+            <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
+            <Button onClick={() => setStep(4)} rightIcon={<ChevronRight className="w-3.5 h-3.5" />}>
+              Run {selectedModules.length} Scan{selectedModules.length !== 1 ? "s" : ""}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 4: Sequential execution ──────────────────────────────────── */}
+      {step === 4 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-[#212121]">
+              Scanning module {Math.min(currentIndex + 1, scanResults.length)} of {scanResults.length}...
+            </p>
+            <button
+              onClick={() => { stopRef.current = true; }}
+              className="text-xs text-red-500 hover:underline"
+            >
+              Stop
+            </button>
+          </div>
+
+          <div className="border border-[#E6E6E6] rounded-xl divide-y divide-[#F5F3F3] max-h-80 overflow-y-auto">
+            {scanResults.map((r, idx) => (
+              <div key={idx} className="flex items-center gap-3 px-4 py-3">
+                <StatusIcon status={r.status} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#212121] truncate">{r.moduleName}</p>
+                  <p className="text-xs text-[#8C8C8C] truncate">{r.moduleUrl}</p>
+                </div>
+                <div className="text-xs text-[#6B6B6B] shrink-0">
+                  {r.status === "pending" && "Waiting..."}
+                  {r.status === "running" && <span className="text-blue-500 font-medium">Running...</span>}
+                  {r.status === "completed" && r.score != null && (
+                    <span className="text-green-600 font-semibold">{r.score.toFixed(0)}/100</span>
+                  )}
+                  {r.status === "failed" && <span className="text-red-500">Failed</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 5: Summary ────────────────────────────────────────────────── */}
+      {step === 5 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-[#F5F3F3] rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-[#212121]">{scanResults.length}</p>
+              <p className="text-xs text-[#6B6B6B] mt-0.5">Total Scanned</p>
+            </div>
+            <div className="bg-green-50 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-green-600">{completedCount}</p>
+              <p className="text-xs text-green-700 mt-0.5">Completed</p>
+            </div>
+            <div className="bg-red-50 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-red-600">{failedCount}</p>
+              <p className="text-xs text-red-700 mt-0.5">Failed</p>
+            </div>
+          </div>
+
+          <div className="border border-[#E6E6E6] rounded-xl divide-y divide-[#F5F3F3] max-h-72 overflow-y-auto">
+            {scanResults.map((r, idx) => (
+              <div key={idx} className="flex items-center gap-3 px-4 py-3">
+                <StatusIcon status={r.status} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#212121] truncate">{r.moduleName}</p>
+                  {r.status === "failed" && r.errorMessage && (
+                    <p className="text-xs text-red-500 truncate">{r.errorMessage}</p>
+                  )}
+                </div>
+                {r.grade && (
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${GRADE_COLORS[r.grade] ?? "text-gray-600 bg-gray-50"}`}>
+                    {r.grade}
+                  </span>
+                )}
+                {r.score != null && (
+                  <span className="text-xs text-[#6B6B6B] w-12 text-right">{r.score.toFixed(0)}/100</span>
+                )}
+                {r.runId && (
+                  <a
+                    href={`/reports/${r.runId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#FF6C37] hover:text-[#E5592B]"
+                    title="View full report"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-between pt-1">
+            <Button variant="outline" onClick={resetWizard} leftIcon={<RotateCcw className="w-3.5 h-3.5" />}>
+              Run Again
+            </Button>
+            <Button onClick={handleClose}>Close</Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}

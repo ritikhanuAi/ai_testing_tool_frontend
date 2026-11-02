@@ -27,6 +27,7 @@ import {
 } from "@/components/websites/ExecutionPipelineView";
 import { ScanCompletedView } from "@/components/websites/ScanCompletedView";
 import { ScanFailedView } from "@/components/websites/ScanFailedView";
+import { ModuleDiscoveryModal } from "@/components/websites/ModuleDiscoveryModal";
 
 export default function WebsiteTestingPage() {
   const router = useRouter();
@@ -83,6 +84,9 @@ export default function WebsiteTestingPage() {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [uploadedCasesCount, setUploadedCasesCount] = useState(0);
   const [testModeError, setTestModeError] = useState("");
+
+  // Module Discovery Modal State
+  const [moduleDiscoveryOpen, setModuleDiscoveryOpen] = useState(false);
 
   // Execution State: "idle" | "running" | "completed" | "failed"
   const [executionState, setExecutionState] = useState<"idle" | "running" | "completed" | "failed">("idle");
@@ -689,6 +693,16 @@ export default function WebsiteTestingPage() {
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
+                  size="md"
+                  disabled={isLaunching}
+                  onClick={() => setModuleDiscoveryOpen(true)}
+                  leftIcon={<Layers className="w-3.5 h-3.5" />}
+                >
+                  Discover Modules
+                </Button>
+                <Button
+                  type="button"
                   variant="secondary"
                   size="md"
                   disabled={isLaunching}
@@ -795,6 +809,13 @@ export default function WebsiteTestingPage() {
           onViewAllRuns={() => router.push("/test-runs")}
         />
       )}
+
+      {/* Module Discovery Wizard Modal */}
+      <ModuleDiscoveryModal
+        isOpen={moduleDiscoveryOpen}
+        onClose={() => setModuleDiscoveryOpen(false)}
+        initialUrl={domainPath ? `${protocol}${domainPath}` : undefined}
+      />
     </div>
   );
 }
