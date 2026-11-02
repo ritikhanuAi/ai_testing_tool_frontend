@@ -1,12 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/common/Card";
 import { Button } from "@/components/common/Button";
 import { Input, Select } from "@/components/common/Input";
 import { YamlEditor } from "@/components/test-packs/YamlEditor";
-import { useCreateTestPack, useValidateTestPack } from "@/features/test-packs";
+import {
+  useCreateTestPack,
+  useValidateTestPack,
+  parseTestCasesText,
+  readTestCaseFile,
+  toTestPackYaml,
+  fileTitle,
+  TEST_CASE_FILE_ACCEPT,
+} from "@/features/test-packs";
 import { useWebsites } from "@/features/websites";
 import {
   FileCode,
@@ -16,26 +24,103 @@ import {
   Save,
   ArrowLeft,
   Layers,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 
-const DEFAULT_YAML = `title: "User Journey Smoke Test"
+// Templates use the exact format the backend validates (pack_id, cases, steps, assertions).
+const DEFAULT_YAML = `# Replace example.com and the selectors with your own website's.
+pack_id: "homepage-smoke"
+title: "Homepage Smoke Test"
 version: "1.0.0"
-test_cases:
-  - id: "tc_homepage_navigation"
-    name: "Homepage Navigation & Hero Verification"
-    actions:
-      - type: "navigate"
-        url: "https://example.com"
-      - type: "wait_for_selector"
-        selector: "h1"
+cases:
+  - id: "SMOKE-001"
+    title: "Homepage loads and shows the main heading"
+    pillar: "functional"
+    risk: "read_only"
+    tags: ["smoke"]
+    steps:
+      - action: "open_page"
+        value: "https://example.com"
+      - action: "wait"
+        timeout_ms: 1000
     assertions:
-      - type: "assert_status"
-        code: 200
-      - type: "assert_text"
-        selector: "h1"
-        expected: "Example Domain"
+      - type: "status_code_equals"
+        value: 200
+      - type: "element_visible"
+        target: "h1"
+      - type: "text_contains"
+        target: "h1"
+        value: "Example Domain"
 `;
+
+const LOGIN_TEMPLATE_YAML = `# Read-only checks of a login form. Never put real passwords in a test file.
+pack_id: "login-form-validation"
+title: "Login Form Validation"
+version: "1.0.0"
+cases:
+  - id: "LOGIN-001"
+    title: "Login form rejects an invalid email address"
+    pillar: "functional"
+    risk: "read_only"
+    tags: ["login", "validation"]
+    steps:
+      - action: "open_page"
+        value: "https://example.com/login"
+      - action: "type_text"
+        target: "input[type='email']"
+        value: "not-an-email"
+    assertions:
+      - type: "input_invalid"
+        target: "input[type='email']"
+  - id: "LOGIN-002"
+    title: "Empty login form is reported as incomplete"
+    pillar: "functional"
+    risk: "read_only"
+    tags: ["login", "required_fields"]
+    steps:
+      - action: "open_page"
+        value: "https://example.com/login"
+    assertions:
+      - type: "form_invalid"
+        target: "form"
+`;
+
+const SEARCH_TEMPLATE_YAML = `# Search and check that results appear.
+pack_id: "catalog-search"
+title: "Catalog Search Flow"
+version: "1.0.0"
+cases:
+  - id: "SEARCH-001"
+    title: "Searching shows matching products"
+    pillar: "functional"
+    risk: "read_only"
+    tags: ["search"]
+    steps:
+      - action: "open_page"
+        value: "https://example.com/products"
+      - action: "type_text"
+        target: "#search-box"
+        value: "Wireless Headset"
+      - action: "click"
+        target: "#search-btn"
+      - action: "wait"
+        timeout_ms: 1500
+    assertions:
+      - type: "element_visible"
+        target: ".product-item"
+      - type: "url_contains"
+        value: "q=Wireless"
+`;
+
+const SUPPORTED_ACTIONS = ["open_page", "click", "type_text", "select_option", "wait", "scroll", "hover", "download", "reload_page"];
+const SUPPORTED_ASSERTIONS = [
+  "element_visible", "element_hidden", "text_contains", "text_equals",
+  "url_contains", "page_title_contains", "status_code_equals", "page_no_server_error",
+  "input_invalid", "form_invalid", "option_list_not_empty", "option_count_equals",
+  "text_not_contains", "attribute_equals", "page_load_time_less_than", "response_time_less_than",
+  "render_time_less_than",
+];
 
 export default function NewTestPackPage() {
   const router = useRouter();
@@ -43,10 +128,13 @@ export default function NewTestPackPage() {
   const createTestPack = useCreateTestPack();
   const validateTestPack = useValidateTestPack();
 
-  const [title, setTitle] = useState("User Journey Smoke Test");
+  const [title, setTitle] = useState("Homepage Smoke Test");
   const [version, setVersion] = useState("1.0.0");
   const [websiteId, setWebsiteId] = useState("");
   const [yamlContent, setYamlContent] = useState(DEFAULT_YAML);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [validationResult, setValidationResult] = useState<{
     is_valid: boolean;
     cases_count: number;
@@ -89,52 +177,31 @@ export default function NewTestPackPage() {
     }
   };
 
-  const handleGenerateAiPrompt = (type: "login" | "search") => {
+  const handleUseTemplate = (type: "login" | "search") => {
     if (type === "login") {
-      setYamlContent(`title: "Synthetic Login & Session Verification"
-version: "1.1.0"
-test_cases:
-  - id: "tc_auth_login"
-    name: "User Login & Dashboard Redirect"
-    actions:
-      - type: "navigate"
-        url: "https://example.com/login"
-      - type: "fill"
-        selector: "input[type='email']"
-        value: "tester@company.internal"
-      - type: "fill"
-        selector: "input[type='password']"
-        value: "{{VAULT_TESTER_PASSWORD}}"
-      - type: "click"
-        selector: "button[type='submit']"
-      - type: "wait_for_selector"
-        selector: "#dashboard-nav"
-    assertions:
-      - type: "assert_url"
-        value: "/dashboard"
-`);
-      setTitle("Synthetic Login & Session Verification");
+      setYamlContent(LOGIN_TEMPLATE_YAML);
+      setTitle("Login Form Validation");
     } else {
-      setYamlContent(`title: "Catalog Search & Filter Flow"
-version: "1.0.0"
-test_cases:
-  - id: "tc_search_query"
-    name: "Product Search & Result Grid"
-    actions:
-      - type: "navigate"
-        url: "https://example.com/products"
-      - type: "fill"
-        selector: "#search-box"
-        value: "Wireless Headset"
-      - type: "click"
-        selector: "#search-btn"
-      - type: "wait_for_selector"
-        selector: ".product-item"
-    assertions:
-      - type: "assert_url"
-        value: "q=Wireless"
-`);
-      setTitle("Catalog Search & Filter Flow");
+      setYamlContent(SEARCH_TEMPLATE_YAML);
+      setTitle("Catalog Search Flow");
+    }
+    setUploadError(null);
+    setFileName(null);
+  };
+
+  // Upload a .yaml / .yml / .json file and turn it into a full test pack in the editor.
+  const handleFileUpload = async (file: File) => {
+    setUploadError(null);
+    try {
+      const text = await readTestCaseFile(file);
+      const parsed = parseTestCasesText(text);
+      const packTitle = parsed.title || fileTitle(file.name);
+      setYamlContent(toTestPackYaml(parsed, packTitle));
+      setTitle(packTitle);
+      if (parsed.version) setVersion(parsed.version);
+      setFileName(file.name);
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : "Could not read the file.");
     }
   };
 
@@ -200,27 +267,53 @@ test_cases:
       <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 text-xs text-indigo-300">
           <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
-          <span>Need inspiration? Pre-populate with realistic AI testing templates:</span>
+          <span>Start from a template, or upload your own test case file:</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={TEST_CASE_FILE_ACCEPT}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileUpload(file);
+              e.target.value = ""; // allow picking the same file again
+            }}
+          />
           <Button
-            variant="outline"
+            variant="primary"
             size="sm"
-            onClick={() => handleGenerateAiPrompt("login")}
-            className="text-indigo-300 border-indigo-500/40 hover:bg-indigo-500/15"
+            onClick={() => fileInputRef.current?.click()}
+            leftIcon={<Upload className="w-3.5 h-3.5" />}
           >
-            Auth Login Flow
+            Upload .yaml / .json
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => handleGenerateAiPrompt("search")}
+            onClick={() => handleUseTemplate("login")}
+            className="text-indigo-300 border-indigo-500/40 hover:bg-indigo-500/15"
+          >
+            Login Form Template
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleUseTemplate("search")}
             className="text-cyan-300 border-cyan-500/40 hover:bg-cyan-500/15"
           >
-            Search & Filter Flow
+            Search Flow Template
           </Button>
         </div>
       </div>
+
+      {uploadError && (
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2" role="alert">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <span>{uploadError}</span>
+        </div>
+      )}
 
       {/* Split Studio Pane */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -229,9 +322,9 @@ test_cases:
           <div className="flex items-center justify-between px-1 text-xs text-slate-400">
             <span className="flex items-center gap-1.5 font-mono">
               <FileCode className="w-3.5 h-3.5 text-indigo-400" />
-              test-pack.yaml
+              {fileName ? `${fileName} → test-pack.yaml` : "test-pack.yaml"}
             </span>
-            <span>Syntax: YAML 1.2</span>
+            <span>YAML (JSON also accepted)</span>
           </div>
           <YamlEditor value={yamlContent} onChange={setYamlContent} height="520px" />
         </div>
@@ -302,15 +395,22 @@ test_cases:
             {/* Schema Reference Guide */}
             <div className="mt-5 pt-4 border-t border-slate-800 text-xs space-y-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                Supported Action Primitives
+                Supported Step Actions
               </span>
               <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono text-slate-300">
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">navigate</span>
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">fill</span>
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">click</span>
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">wait_for_selector</span>
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">assert_url</span>
-                <span className="p-1.5 rounded bg-slate-900 border border-slate-800">assert_text</span>
+                {SUPPORTED_ACTIONS.map((action) => (
+                  <span key={action} className="p-1.5 rounded bg-slate-900 border border-slate-800">{action}</span>
+                ))}
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block pt-2">
+                Supported Assertions
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono text-slate-300">
+                {SUPPORTED_ASSERTIONS.map((assertion) => (
+                  <span key={assertion} className="p-1.5 rounded bg-slate-900 border border-slate-800 truncate" title={assertion}>
+                    {assertion}
+                  </span>
+                ))}
               </div>
             </div>
           </Card>

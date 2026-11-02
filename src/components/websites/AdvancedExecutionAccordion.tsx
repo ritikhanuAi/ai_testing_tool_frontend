@@ -37,6 +37,8 @@ interface AdvancedExecutionAccordionProps {
   setRecordVideo: (val: boolean) => void;
   headedBrowser?: boolean;
   setHeadedBrowser?: (val: boolean) => void;
+  /** False in human test case mode: AI options are hidden because no AI runs. */
+  aiOptionsEnabled?: boolean;
 }
 
 export function AdvancedExecutionAccordion({
@@ -70,6 +72,7 @@ export function AdvancedExecutionAccordion({
   setRecordVideo,
   headedBrowser = false,
   setHeadedBrowser = () => {},
+  aiOptionsEnabled = true,
 }: AdvancedExecutionAccordionProps) {
   return (
     <div className="pt-1">
@@ -206,7 +209,7 @@ export function AdvancedExecutionAccordion({
                 <input
                   type="number"
                   min="30"
-                  max="600"
+                  max="1800"
                   value={timeoutSeconds}
                   onChange={(e) => setTimeoutSeconds(e.target.value)}
                   className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
@@ -245,6 +248,11 @@ export function AdvancedExecutionAccordion({
               <Sparkles className="w-3.5 h-3.5 text-[#FF6C37]" />
               AI Test Intelligence
             </h4>
+            {!aiOptionsEnabled ? (
+              <p className="text-xs text-[#6B6B6B] bg-[#F5F3F3] border border-[#E6E6E6] rounded-lg px-3 py-2">
+                AI is turned off: you chose human test cases, so this scan uses no AI.
+              </p>
+            ) : (
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-medium text-[#594139] mb-1">
@@ -274,6 +282,7 @@ export function AdvancedExecutionAccordion({
                 />
               </div>
             </div>
+            )}
           </div>
 
           {/* Part 4: Diagnostics & Tracing */}

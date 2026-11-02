@@ -7,6 +7,7 @@ import {
   TestRunResponse,
   TriggerScanRequest,
   QuickScanRequest,
+  CustomScanRequest,
   WebsiteAnalyzeResponse,
   RunLogsResponse,
 } from "@/types/test-run";
@@ -42,6 +43,16 @@ export async function quickScan(payload: QuickScanRequest): Promise<TestRunRespo
   if (API_CONFIG.useMock) return mockStore.triggerScan({ website_id: "mock-site-1" });
   const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
     TEST_RUN_ENDPOINTS.QUICK_SCAN,
+    payload
+  );
+  return res.data.data;
+}
+
+/** Human test case mode: run only the supplied human-written test cases (no AI). */
+export async function executeCustomScan(payload: CustomScanRequest): Promise<TestRunResponse> {
+  if (API_CONFIG.useMock) return mockStore.triggerScan({ website_id: "mock-site-1" });
+  const res = await axiosClient.post<ResponseEnvelope<TestRunResponse>>(
+    TEST_RUN_ENDPOINTS.EXECUTE_CUSTOM,
     payload
   );
   return res.data.data;

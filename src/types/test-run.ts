@@ -39,6 +39,17 @@ export interface QuickScanRequest {
   options?: AdvancedExecutionOptions;
 }
 
+/** Human test case mode request: `cases` is the YAML/JSON text of the test cases. */
+export interface CustomScanRequest {
+  url: string;
+  name?: string;
+  credentials?: AuthenticationPayload;
+  options?: AdvancedExecutionOptions;
+  cases: string;
+}
+
+export type TestCaseMode = "ai" | "human";
+
 export interface TriggerScanRequest {
   website_id: string;
   scan_profile_id?: string;

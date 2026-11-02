@@ -19,7 +19,7 @@ export function FindingDetailModal({ isOpen, onClose, finding }: FindingDetailMo
   if (!finding) return null;
 
   const copyFingerprint = () => {
-    navigator.clipboard.writeText(finding.fingerprint);
+    navigator.clipboard.writeText(finding.fingerprint ?? finding.id);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -43,7 +43,7 @@ export function FindingDetailModal({ isOpen, onClose, finding }: FindingDetailMo
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#6B6B6B]">SHA-1 Fingerprint:</span>
             <span className="font-mono text-xs text-[#FF6C37] bg-[#FFF1EB] px-2 py-0.5 rounded border border-[#FEDF89]">
-              {finding.fingerprint}
+              {finding.fingerprint ?? "—"}
             </span>
             <button
               onClick={copyFingerprint}
@@ -101,7 +101,7 @@ export function FindingDetailModal({ isOpen, onClose, finding }: FindingDetailMo
               <Terminal className="w-6 h-6 text-[#FF6C37]" />
             </div>
             <p className="text-xs text-[#212121] font-mono font-medium">
-              {finding.evidence_path || `storage/evidence/${finding.fingerprint}.png`}
+              {finding.evidence_path || "No screenshot was captured for this finding."}
             </p>
             <p className="text-[11px] text-[#6B6B6B]">
               High-resolution viewport screenshot and DOM tree captured at step execution.

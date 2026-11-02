@@ -8,7 +8,7 @@ export interface PillarFinding {
   evidence_path?: string;
   selector_or_url?: string;
   suggested_fix?: string;
-  fingerprint: string;
+  fingerprint?: string; // not always sent by the backend
 }
 
 export interface PillarScanResult {
@@ -56,6 +56,11 @@ export interface UnifiedReportData {
   reported_findings?: number;
   findings_truncated?: boolean;
   score_method?: string;
+  /** "human" = human-written test pack, no AI used; "ai" = AI wrote the test cases. Missing on older reports. */
+  test_case_mode?: "human" | "ai";
+  ai_used?: boolean;
+  incomplete?: boolean;
+  incomplete_reason?: string;
 }
 
 export interface ReportSummaryResponse {

@@ -25,6 +25,7 @@ import {
   Sparkles,
   ChevronRight,
   FileSpreadsheet,
+  UserRound,
 } from "lucide-react";
 
 export default function ReportDetailPage() {
@@ -76,6 +77,7 @@ export default function ReportDetailPage() {
   const pillarResults = report.report_data?.pillar_results || {};
   const effectiveWeights = report.report_data?.effective_pillar_weights || {};
   const executedTestCases = report.report_data?.test_cases || [];
+  const testCaseMode = report.report_data?.test_case_mode;
 
   const isFunctionalSkipped = pillarResults.functional?.status === "SKIPPED";
   const isSecuritySkipped = pillarResults.security?.status === "SKIPPED";
@@ -93,7 +95,7 @@ export default function ReportDetailPage() {
       const q = searchQuery.toLowerCase();
       const matchTitle = f.title.toLowerCase().includes(q);
       const matchDesc = f.description.toLowerCase().includes(q);
-      const matchFp = f.fingerprint.toLowerCase().includes(q);
+      const matchFp = (f.fingerprint ?? "").toLowerCase().includes(q);
       if (!matchTitle && !matchDesc && !matchFp) return false;
     }
     return true;
@@ -117,6 +119,24 @@ export default function ReportDetailPage() {
               <span className="font-mono text-xs text-[#FF6C37] bg-[#FFF1EB] px-2.5 py-0.5 rounded border border-[#FEDF89] font-semibold">
                 {runId}
               </span>
+              {testCaseMode === "human" && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#175CD3] bg-[#EFF8FF] px-2.5 py-0.5 rounded border border-[#B2DDFF]"
+                  title="Only human-written test cases ran. No AI was used in this scan."
+                >
+                  <UserRound className="w-3 h-3" />
+                  Human test cases · No AI
+                </span>
+              )}
+              {testCaseMode === "ai" && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#6941C6] bg-[#FAF5FF] px-2.5 py-0.5 rounded border border-[#E9D7FE]"
+                  title="AI explored the site and wrote the test cases for this scan."
+                >
+                  <Sparkles className="w-3 h-3" />
+                  AI test cases
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#6B6B6B] mt-1">
               Target:{" "}
@@ -129,6 +149,17 @@ export default function ReportDetailPage() {
                 {report.report_data.target_url}
               </a>
             </p>
+            {testCaseMode === "human" && (
+              <p className="text-xs text-[#6B6B6B] mt-1">
+                Only your human-written test cases ran. AI was turned off, so there are no AI explanations or AI
+                screenshot review in this report.
+              </p>
+            )}
+            {report.report_data?.incomplete && (
+              <p className="text-xs text-[#B54708] mt-1">
+                Partial report: {report.report_data.incomplete_reason || "some checks did not finish in time."}
+              </p>
+            )}
           </div>
         </div>
 
@@ -489,7 +520,7 @@ export default function ReportDetailPage() {
                       )}
                     </td>
                     <td className="py-3.5 px-4 align-top font-mono text-[#FF6C37] text-xs">
-                      {finding.fingerprint}
+                      {finding.fingerprint ?? "—"}
                     </td>
                     <td className="py-3.5 px-4 align-top text-right">
                       <Button

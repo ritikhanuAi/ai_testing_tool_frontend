@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { Rocket, RotateCcw, PauseCircle, Loader2, AlertCircle, Layers, Shield, FileCode2 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
-import { useQuickScan, useTestRun, useCancelScan } from "@/features/test-runs";
-import { QuickScanRequest } from "@/types/test-run";
+import { useQuickScan, useExecuteCustomScan, useTestRun, useCancelScan } from "@/features/test-runs";
+import { useTestPacks, parseTestCasesText, readTestCaseFile } from "@/features/test-packs";
+import { QuickScanRequest, AdvancedExecutionOptions, TestCaseMode } from "@/types/test-run";
+import { TestCaseModeSection } from "@/components/websites/TestCaseModeSection";
 import {
   UrlProtocolInput,
   TargetEnvType,
@@ -74,6 +76,14 @@ export default function WebsiteTestingPage() {
   const [maxAiCases, setMaxAiCases] = useState(5);
   const [aiExplainFailures, setAiExplainFailures] = useState(true);
 
+  // Test Case Mode: "ai" (AI writes the tests) or "human" (only human-written tests, no AI)
+  const [testMode, setTestMode] = useState<TestCaseMode>("ai");
+  const [selectedPackId, setSelectedPackId] = useState("");
+  const [uploadedCasesText, setUploadedCasesText] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedCasesCount, setUploadedCasesCount] = useState(0);
+  const [testModeError, setTestModeError] = useState("");
+
   // Execution State: "idle" | "running" | "completed" | "failed"
   const [executionState, setExecutionState] = useState<"idle" | "running" | "completed" | "failed">("idle");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -82,6 +92,9 @@ export default function WebsiteTestingPage() {
 
   // API Hooks
   const quickScan = useQuickScan();
+  const executeCustomScan = useExecuteCustomScan();
+  const isLaunching = quickScan.isPending || executeCustomScan.isPending;
+  const { data: testPacks = [] } = useTestPacks();
   const cancelScan = useCancelScan();
   const { data: runData } = useTestRun(activeRunId || "");
 
@@ -234,6 +247,35 @@ export default function WebsiteTestingPage() {
     }
   }, [runData, executionState]);
 
+  // Human mode: read an uploaded test case file and count its cases
+  const handleTestFileSelected = async (file: File) => {
+    setTestModeError("");
+    try {
+      const text = await readTestCaseFile(file);
+      const parsed = parseTestCasesText(text);
+      setUploadedCasesText(text);
+      setUploadedFileName(file.name);
+      setUploadedCasesCount(parsed.cases.length);
+      setSelectedPackId("");
+    } catch (err: unknown) {
+      setUploadedCasesText(null);
+      setUploadedFileName(null);
+      setUploadedCasesCount(0);
+      setTestModeError(err instanceof Error ? err.message : "Could not read the file.");
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedCasesText(null);
+    setUploadedFileName(null);
+    setUploadedCasesCount(0);
+  };
+
+  const handleTestModeChange = (mode: TestCaseMode) => {
+    setTestMode(mode);
+    setTestModeError("");
+  };
+
   // Launch scan handler
   const handleStartTest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -250,6 +292,21 @@ export default function WebsiteTestingPage() {
     if (selectedPillarsCount === 0) {
       setPillarError("Please select at least one quality testing pillar to launch the scan.");
       return;
+    }
+
+    // Human mode needs test cases, and they run inside the Functional check.
+    let humanCasesText: string | null = null;
+    if (testMode === "human") {
+      humanCasesText =
+        uploadedCasesText ?? testPacks.find((pack) => pack.id === selectedPackId)?.raw_yaml ?? null;
+      if (!humanCasesText) {
+        setTestModeError("Choose a saved test pack or upload a test case file.");
+        return;
+      }
+      if (!checkFunctional) {
+        setTestModeError("Human test cases run in the Functional check. Turn on Functional to run them.");
+        return;
+      }
     }
 
     try {
@@ -293,7 +350,19 @@ export default function WebsiteTestingPage() {
       setElapsedSeconds(0);
       setExecutionState("running");
 
-      const run = await quickScan.mutateAsync(payload);
+      let run;
+      if (testMode === "human" && humanCasesText) {
+        // Human mode: switch every AI option off; the backend also disables AI for test packs.
+        const humanOptions: AdvancedExecutionOptions = {
+          ...payload.options,
+          use_ai_generation: false,
+          ai_test_goals: undefined,
+          ai_explain_failures: false,
+        };
+        run = await executeCustomScan.mutateAsync({ ...payload, options: humanOptions, cases: humanCasesText });
+      } else {
+        run = await quickScan.mutateAsync(payload);
+      }
       setActiveRunId(run.id);
     } catch (err: unknown) {
       setExecutionState("idle");
@@ -347,6 +416,10 @@ export default function WebsiteTestingPage() {
     setAiTestGoals("");
     setMaxAiCases(5);
     setAiExplainFailures(true);
+    setTestMode("ai");
+    setSelectedPackId("");
+    clearUploadedFile();
+    setTestModeError("");
     setExecutionState("idle");
     setActiveRunId(null);
     setElapsedSeconds(0);
@@ -383,7 +456,7 @@ export default function WebsiteTestingPage() {
     },
     {
       id: "step-3",
-      name: "Autonomous AI Landmark & Workflow Discovery",
+      name: testMode === "human" ? "Human Test Case Execution" : "Autonomous AI Landmark & Workflow Discovery",
       status:
         elapsedSeconds < 5
           ? "pending"
@@ -391,10 +464,12 @@ export default function WebsiteTestingPage() {
           ? "done"
           : "running",
       duration: elapsedSeconds >= 12 || isDone ? "6.8s" : undefined,
-      meta: useAiGeneration
+      meta: testMode === "human"
+        ? "Running your human-written test cases (AI is turned off)"
+        : useAiGeneration
         ? "Extracting interactive buttons, forms, and synthesizing AI journey cases"
         : "Crawling page landmarks and executing baseline interactions",
-      badge: "AI Engine",
+      badge: testMode === "human" ? "Human" : "AI Engine",
     },
     {
       id: "step-4",
@@ -420,7 +495,7 @@ export default function WebsiteTestingPage() {
     },
     {
       id: "step-5",
-      name: "AI Failure Diagnosis & Report Aggregation",
+      name: testMode === "human" ? "Report Aggregation" : "AI Failure Diagnosis & Report Aggregation",
       status: isDone ? "done" : isRunning && elapsedSeconds > 20 ? "running" : "pending",
       duration: isDone ? "1.8s" : undefined,
       meta: "Synthesizing test findings, evidence traces, and unified quality score",
@@ -522,6 +597,23 @@ export default function WebsiteTestingPage() {
                 clearPillarError={() => setPillarError("")}
               />
 
+              {/* Test Case Mode: AI or Human (exclusive) */}
+              <TestCaseModeSection
+                mode={testMode}
+                setMode={handleTestModeChange}
+                packs={testPacks}
+                selectedPackId={selectedPackId}
+                setSelectedPackId={(id) => {
+                  setSelectedPackId(id);
+                  setTestModeError("");
+                }}
+                uploadedFileName={uploadedFileName}
+                uploadedCasesCount={uploadedCasesCount}
+                onFileSelected={handleTestFileSelected}
+                onClearFile={clearUploadedFile}
+                error={testModeError}
+              />
+
               {/* Authentication Requirements Drawer */}
               <AuthenticationDrawer
                 authEnabled={authEnabled}
@@ -572,6 +664,7 @@ export default function WebsiteTestingPage() {
                 setRecordVideo={setRecordVideo}
                 headedBrowser={headedBrowser}
                 setHeadedBrowser={setHeadedBrowser}
+                aiOptionsEnabled={testMode === "ai"}
               />
 
               {/* Action Buttons */}
@@ -580,23 +673,25 @@ export default function WebsiteTestingPage() {
                   type="submit"
                   variant="primary"
                   size="md"
-                  disabled={quickScan.isPending || selectedPillarsCount === 0}
+                  disabled={isLaunching || selectedPillarsCount === 0}
                   className="flex-1"
                   leftIcon={
-                    quickScan.isPending ? (
+                    isLaunching ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Rocket className="w-3.5 h-3.5" />
                     )
                   }
                 >
-                  {quickScan.isPending ? "Dispatching Autonomous Scan..." : "Start Test"}
+                  {isLaunching
+                    ? testMode === "human" ? "Starting Human Test Run..." : "Dispatching Autonomous Scan..."
+                    : "Start Test"}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   size="md"
-                  disabled={quickScan.isPending}
+                  disabled={isLaunching}
                   onClick={handleReset}
                   leftIcon={<RotateCcw className="w-3.5 h-3.5 text-[#8C8C8C]" />}
                 >

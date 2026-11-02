@@ -4,6 +4,7 @@ import {
   TriggerScanRequest,
   TestRunResponse,
   QuickScanRequest,
+  CustomScanRequest,
   WebsiteAnalyzeResponse,
 } from "@/types/test-run";
 
@@ -50,6 +51,20 @@ export function useQuickScan() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
       queryClient.invalidateQueries({ queryKey: ["websites"] });
+    },
+  });
+}
+
+export function useExecuteCustomScan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CustomScanRequest) => testRunService.executeCustomScan(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["test-runs"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["websites"] });
+      queryClient.invalidateQueries({ queryKey: ["test-packs"] });
     },
   });
 }
