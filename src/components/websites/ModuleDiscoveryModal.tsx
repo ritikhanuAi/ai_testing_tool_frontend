@@ -72,8 +72,8 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [checkPerformance, setCheckPerformance] = useState(true);
   const [checkAccessibility, setCheckAccessibility] = useState(true);
 
-  // Step 3 — Advanced Execution Options (mirrors websites/page.tsx)
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Step 3 — Advanced Execution Options (open by default in wizard)
+  const [advancedOpen, setAdvancedOpen] = useState(true);
   const [browserEngine, setBrowserEngine] = useState<"chromium" | "firefox" | "webkit">("chromium");
   const [viewportProfile, setViewportProfile] = useState<ViewportProfileType>("desktop");
   const [viewportWidth, setViewportWidth] = useState(1440);
@@ -130,7 +130,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setCheckSecurity(true);
     setCheckPerformance(true);
     setCheckAccessibility(true);
-    setAdvancedOpen(false);
+    setAdvancedOpen(true);
     setBrowserEngine("chromium");
     setViewportProfile("desktop");
     setViewportWidth(1440);
