@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { AuthenticationDrawer } from "@/components/websites/AuthenticationDrawer";
+import { AdvancedExecutionAccordion, ViewportProfileType } from "@/components/websites/AdvancedExecutionAccordion";
 import { Button } from "@/components/common/Button";
 import * as testRunService from "@/features/test-runs/api/testRunService";
 import {
@@ -65,14 +66,28 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [moduleRows, setModuleRows] = useState<WizardModuleRow[]>([]);
 
-  // Step 3 — Scan settings
+  // Step 3 — Quality Pillars
   const [checkFunctional, setCheckFunctional] = useState(true);
   const [checkSecurity, setCheckSecurity] = useState(true);
   const [checkPerformance, setCheckPerformance] = useState(true);
   const [checkAccessibility, setCheckAccessibility] = useState(true);
+
+  // Step 3 — Advanced Execution Options (mirrors websites/page.tsx)
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [browserEngine, setBrowserEngine] = useState<"chromium" | "firefox" | "webkit">("chromium");
+  const [viewportProfile, setViewportProfile] = useState<ViewportProfileType>("desktop");
+  const [viewportWidth, setViewportWidth] = useState(1440);
+  const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
-  const [maxDepth, setMaxDepth] = useState(5);
-  const [allowStateChanging, setAllowStateChanging] = useState(true);
+  const [maxDepth, setMaxDepth] = useState(2);
+  const [rateLimitRps, setRateLimitRps] = useState(10);
+  const [readOnlyMode, setReadOnlyMode] = useState(false);
+  const [recordTrace, setRecordTrace] = useState(true);
+  const [recordVideo, setRecordVideo] = useState(false);
+  const [headedBrowser, setHeadedBrowser] = useState(false);
+  const [useAiGeneration, setUseAiGeneration] = useState(true);
+  const [aiTestGoals, setAiTestGoals] = useState("");
+  const [aiExplainFailures, setAiExplainFailures] = useState(true);
 
   // Step 4 — Execution
   const [scanResults, setScanResults] = useState<ModuleScanResult[]>([]);
@@ -83,6 +98,17 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   useEffect(() => {
     if (isOpen) setTargetUrl(initialUrl);
   }, [isOpen, initialUrl]);
+
+  function handleViewportChange(profile: ViewportProfileType) {
+    setViewportProfile(profile);
+    switch (profile) {
+      case "desktop": setViewportWidth(1440); setViewportHeight(900); break;
+      case "laptop":  setViewportWidth(1280); setViewportHeight(800); break;
+      case "tablet":  setViewportWidth(1024); setViewportHeight(1366); break;
+      case "mobile":  setViewportWidth(393);  setViewportHeight(852); break;
+      default: break;
+    }
+  }
 
   function resetWizard() {
     setStep(1);
@@ -100,6 +126,25 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setScanResults([]);
     setCurrentIndex(0);
     stopRef.current = false;
+    setCheckFunctional(true);
+    setCheckSecurity(true);
+    setCheckPerformance(true);
+    setCheckAccessibility(true);
+    setAdvancedOpen(false);
+    setBrowserEngine("chromium");
+    setViewportProfile("desktop");
+    setViewportWidth(1440);
+    setViewportHeight(900);
+    setTimeoutSeconds("600");
+    setMaxDepth(2);
+    setRateLimitRps(10);
+    setReadOnlyMode(false);
+    setRecordTrace(true);
+    setRecordVideo(false);
+    setHeadedBrowser(false);
+    setUseAiGeneration(true);
+    setAiTestGoals("");
+    setAiExplainFailures(true);
   }
 
   function handleClose() {
@@ -160,13 +205,20 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       check_security: checkSecurity,
       check_performance: checkPerformance,
       check_accessibility: checkAccessibility,
+      browser_type: browserEngine,
+      viewport_width: viewportWidth,
+      viewport_height: viewportHeight,
+      is_mobile: viewportProfile === "mobile",
       timeout_seconds: parseInt(timeoutSeconds, 10) || 600,
       max_crawl_depth: maxDepth,
-      allow_state_changing: allowStateChanging,
-      use_ai_generation: true,
-      ai_explain_failures: true,
-      headless: true,
-      record_trace: true,
+      rate_limit_rps: rateLimitRps || 10,
+      allow_state_changing: !readOnlyMode,
+      record_trace: recordTrace,
+      record_video: recordVideo,
+      headless: !headedBrowser,
+      slow_mo_ms: headedBrowser ? 300 : 0,
+      use_ai_generation: useAiGeneration,
+      ai_explain_failures: aiExplainFailures,
     };
 
     (async () => {
@@ -176,11 +228,14 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
         setScanResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "running" } : r));
 
         const mod = selected[i];
+        // Per-module goal wins; fall back to global aiTestGoals if set
+        const moduleGoal = mod.goal || aiTestGoals.trim() || undefined;
+
         const payload: QuickScanRequest = {
           url: mod.url,
           name: mod.name,
           credentials,
-          options: { ...globalOptions, ai_test_goals: mod.goal },
+          options: { ...globalOptions, ai_test_goals: moduleGoal },
         };
 
         try {
@@ -214,7 +269,6 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     return <XCircle className="w-4 h-4 text-red-500" />;
   }
 
-  // ── Pillar chip ──────────────────────────────────────────────────────────
   function PillarChip({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
     return (
       <button
@@ -385,7 +439,8 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
 
       {/* ── Step 3: Scan settings ──────────────────────────────────────────── */}
       {step === 3 && (
-        <div className="space-y-5">
+        <div className="space-y-4">
+          {/* Quality Pillars */}
           <div>
             <p className="text-xs font-semibold text-[#212121] mb-2">Quality Pillars</p>
             <div className="flex flex-wrap gap-2">
@@ -396,38 +451,40 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[11px] font-medium text-[#594139] mb-1">Timeout (sec)</label>
-              <input
-                type="number"
-                value={timeoutSeconds}
-                onChange={(e) => setTimeoutSeconds(e.target.value)}
-                min={120} max={1800}
-                className="w-full h-8 px-3 rounded-lg border border-[#E6E6E6] text-xs focus:outline-none focus:border-[#FF6C37]"
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-[#594139] mb-1">Max Depth</label>
-              <select
-                value={maxDepth}
-                onChange={(e) => setMaxDepth(Number(e.target.value))}
-                className="w-full h-8 px-2 rounded-lg border border-[#E6E6E6] text-xs focus:outline-none focus:border-[#FF6C37] bg-white"
-              >
-                {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{d} hop{d > 1 ? "s" : ""}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-[#594139] mb-1">Allow State Changes</label>
-              <button
-                type="button"
-                onClick={() => setAllowStateChanging(!allowStateChanging)}
-                className={`w-full h-8 rounded-lg border text-xs font-medium transition-all ${allowStateChanging ? "bg-[#FF6C37] text-white border-[#FF6C37]" : "bg-white text-[#6B6B6B] border-[#E6E6E6]"}`}
-              >
-                {allowStateChanging ? "Enabled" : "Read-only"}
-              </button>
-            </div>
-          </div>
+          {/* Advanced Execution Options — same accordion used on websites page */}
+          <AdvancedExecutionAccordion
+            advancedOpen={advancedOpen}
+            setAdvancedOpen={setAdvancedOpen}
+            browserEngine={browserEngine}
+            setBrowserEngine={setBrowserEngine}
+            viewportProfile={viewportProfile}
+            handleViewportChange={handleViewportChange}
+            viewportWidth={viewportWidth}
+            setViewportWidth={setViewportWidth}
+            viewportHeight={viewportHeight}
+            setViewportHeight={setViewportHeight}
+            timeoutSeconds={timeoutSeconds}
+            setTimeoutSeconds={setTimeoutSeconds}
+            maxDepth={maxDepth}
+            setMaxDepth={setMaxDepth}
+            rateLimitRps={rateLimitRps}
+            setRateLimitRps={setRateLimitRps}
+            readOnlyMode={readOnlyMode}
+            setReadOnlyMode={setReadOnlyMode}
+            aiTestGoals={aiTestGoals}
+            setAiTestGoals={setAiTestGoals}
+            useAiGeneration={useAiGeneration}
+            setUseAiGeneration={setUseAiGeneration}
+            aiExplainFailures={aiExplainFailures}
+            setAiExplainFailures={setAiExplainFailures}
+            recordTrace={recordTrace}
+            setRecordTrace={setRecordTrace}
+            recordVideo={recordVideo}
+            setRecordVideo={setRecordVideo}
+            headedBrowser={headedBrowser}
+            setHeadedBrowser={setHeadedBrowser}
+            aiOptionsEnabled={true}
+          />
 
           <div className="bg-[#FFF8F6] border border-[#FFD5C8] rounded-lg px-4 py-3 text-xs text-[#594139]">
             <strong>{selectedModules.length} modules</strong> will be scanned sequentially.
