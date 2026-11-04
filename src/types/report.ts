@@ -21,23 +21,27 @@ export interface PillarScanResult {
 }
 
 export interface TestCaseStepResult {
-  step_number: number;
   action: string;
-  target?: string;
-  value?: string;
+  target?: string | null;
+  value?: string | null;
   status: "PASSED" | "FAILED";
-  duration_ms?: number;
   error?: string;
 }
 
 export interface ExecutedTestCase {
   id: string;
   title: string;
-  description?: string;
+  module?: string;
+  test_type?: string;
+  test_scenario?: string;
+  expected_result?: string;
+  actual_result?: string;
+  page_url?: string;
+  pillar?: string;
+  risk?: string;
   steps: TestCaseStepResult[];
-  status: "PASSED" | "FAILED";
-  assertions_passed?: number;
-  assertions_total?: number;
+  assertions_count?: number;
+  passed: boolean;
 }
 
 export interface UnifiedReportData {

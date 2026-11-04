@@ -26,6 +26,7 @@ export interface AdvancedExecutionOptions {
   rate_limit_rps?: number;
   timeout_seconds?: number;
   max_crawl_depth?: number;
+  include_sitemap_urls?: boolean;
   use_ai_generation?: boolean;
   ai_test_goals?: string;
   max_ai_cases?: number;
@@ -62,10 +63,15 @@ export interface TestRunResponse {
   website_id: string;
   scan_profile_id?: string;
   test_pack_id?: string;
+  run_name?: string | null;
   status: RunStatus;
   celery_task_id?: string;
   overall_score?: number | null;
   grade?: string;
+  functional_score?: number | null;
+  security_score?: number | null;
+  performance_score?: number | null;
+  accessibility_score?: number | null;
   started_at?: string;
   completed_at?: string;
   error_message?: string;

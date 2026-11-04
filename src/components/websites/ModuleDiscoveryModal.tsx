@@ -79,7 +79,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
-  const [maxDepth, setMaxDepth] = useState(2);
+  const [maxDepth, setMaxDepth] = useState(1); // test this page, then its directly linked pages
   const [rateLimitRps, setRateLimitRps] = useState(10);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
   const [recordTrace, setRecordTrace] = useState(true);
@@ -136,7 +136,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setViewportWidth(1440);
     setViewportHeight(900);
     setTimeoutSeconds("600");
-    setMaxDepth(2);
+    setMaxDepth(1);
     setRateLimitRps(10);
     setReadOnlyMode(false);
     setRecordTrace(true);
@@ -211,6 +211,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       is_mobile: viewportProfile === "mobile",
       timeout_seconds: parseInt(timeoutSeconds, 10) || 600,
       max_crawl_depth: maxDepth,
+      include_sitemap_urls: false,
       rate_limit_rps: rateLimitRps || 10,
       allow_state_changing: !readOnlyMode,
       record_trace: recordTrace,

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardHeader } from "@/components/common/Card";
+import { Card } from "@/components/common/Card";
 import { Button } from "@/components/common/Button";
 import { GradeBadge } from "@/components/common/GradeBadge";
 import { ScoreGauge } from "@/components/common/ScoreGauge";
@@ -36,6 +36,7 @@ export default function ReportDetailPage() {
   const { data: run } = useTestRun(runId);
 
   const [selectedFinding, setSelectedFinding] = useState<PillarFinding | null>(null);
+  const [pillarFilter, setPillarFilter] = useState<string>("all");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
@@ -73,8 +74,13 @@ export default function ReportDetailPage() {
     );
   }
 
-  const allFindings: PillarFinding[] = report.report_data.all_findings || [];
   const pillarResults = report.report_data?.pillar_results || {};
+
+  // Build findings tagged with their source pillar (from pillar_results, not the flattened all_findings)
+  const allFindings: (PillarFinding & { pillar: string })[] = Object.entries(pillarResults).flatMap(
+    ([pillarName, result]) =>
+      result.findings.map((finding) => ({ ...finding, pillar: pillarName }))
+  );
   const effectiveWeights = report.report_data?.effective_pillar_weights || {};
   const executedTestCases = report.report_data?.test_cases || [];
   const testCaseMode = report.report_data?.test_case_mode;
@@ -90,6 +96,7 @@ export default function ReportDetailPage() {
   const a11yWeight = effectiveWeights.accessibility != null ? `${Math.round(effectiveWeights.accessibility * 100)}%` : (isAccessibilitySkipped ? "Excluded" : "20%");
 
   const filteredFindings = allFindings.filter((f) => {
+    if (pillarFilter !== "all" && f.pillar !== pillarFilter) return false;
     if (severityFilter !== "all" && f.severity !== severityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -372,35 +379,60 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* Executed AI & Synthetic Test Cases */}
-      {executedTestCases.length > 0 && (
-        <Card className="p-0 overflow-hidden bg-white border border-[#E6E6E6] rounded-xl shadow-xs">
-          <div className="p-5 border-b border-[#E6E6E6] flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-semibold text-[#212121] tracking-tight">
-                Executed AI & Synthetic Test Cases
-              </h3>
-              <p className="text-xs text-[#6B6B6B] mt-0.5">
-                {executedTestCases.length} browser scenario(s) synthesized and executed by Playwright
-              </p>
-            </div>
-            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ECFDF3] text-[#12B76A] border border-[#12B76A]/30">
-              {executedTestCases.filter((c: any) => c.passed).length} / {executedTestCases.length} Passed
-            </span>
+      {/* Executed AI & Synthetic Test Cases — always shown */}
+      <Card className="p-0 overflow-hidden bg-white border border-[#E6E6E6] rounded-xl shadow-xs">
+        <div className="p-5 border-b border-[#E6E6E6] flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-[#212121] tracking-tight">
+              Executed AI & Synthetic Test Cases
+            </h3>
+            <p className="text-xs text-[#6B6B6B] mt-0.5">
+              {executedTestCases.length > 0
+                ? `${executedTestCases.length} browser scenario(s) synthesized and executed by Playwright`
+                : "No test cases were executed in this scan"}
+            </p>
           </div>
+          {executedTestCases.length > 0 && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#ECFDF3] text-[#12B76A] border border-[#12B76A]/30">
+              {executedTestCases.filter((testCase) => testCase.passed).length} / {executedTestCases.length} Passed
+            </span>
+          )}
+        </div>
 
+        {executedTestCases.length === 0 ? (
+          <div className="p-8 text-center space-y-2">
+            <p className="text-sm font-semibold text-[#594139]">No test cases executed</p>
+            <p className="text-xs text-[#6B6B6B] max-w-lg mx-auto">
+              {isFunctionalSkipped
+                ? "The Functional pillar was skipped in this scan profile."
+                : testCaseMode === "human"
+                ? "No human test cases were provided for this scan."
+                : "The AI did not find interactive elements to test, or all discovered cases were skipped (read-only mode). Try enabling AI test goals or checking the module URL."}
+            </p>
+          </div>
+        ) : (
           <div className="divide-y divide-[#E6E6E6]">
-            {executedTestCases.map((tc: any, idx: number) => (
+            {executedTestCases.map((tc, idx) => (
               <div key={idx} className="p-4 hover:bg-[#FAFAFA] transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-xs font-bold text-[#FF6C37] bg-[#FFF1EB] px-2 py-0.5 rounded border border-[#FF6C37]/30">
                       {tc.id}
                     </span>
+                    {tc.module && tc.module !== "General" && (
+                      <span className="text-[10px] font-semibold text-[#175CD3] bg-[#EFF8FF] px-2 py-0.5 rounded border border-[#B2DDFF]">
+                        {tc.module}
+                      </span>
+                    )}
+                    {tc.test_type && (
+                      <span className="text-[10px] font-semibold text-[#6B6B6B] bg-[#F5F3F3] px-2 py-0.5 rounded border border-[#E6E6E6]">
+                        {tc.test_type}
+                      </span>
+                    )}
                     <span className="text-sm font-semibold text-[#212121]">{tc.title}</span>
                   </div>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase ${
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase shrink-0 ${
                       tc.passed
                         ? "bg-[#ECFDF3] text-[#027A48] border border-[#12B76A]/30"
                         : "bg-[#FEF3F2] text-[#B42318] border border-[#F04438]/30"
@@ -410,13 +442,35 @@ export default function ReportDetailPage() {
                   </span>
                 </div>
 
+                {tc.page_url && (
+                  <p className="mb-2 text-[11px] text-[#6B6B6B] break-all">Page tested: {tc.page_url}</p>
+                )}
+
+                {/* Expected / Actual Results */}
+                {(tc.expected_result || tc.actual_result) && (
+                  <div className="mt-1.5 grid grid-cols-2 gap-2 text-[11px]">
+                    {tc.expected_result && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#8C8C8C] block mb-0.5">Expected</span>
+                        <span className="text-[#594139]">{tc.expected_result}</span>
+                      </div>
+                    )}
+                    {tc.actual_result && (
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#8C8C8C] block mb-0.5">Actual</span>
+                        <span className={tc.passed ? "text-[#027A48]" : "text-[#B42318]"}>{tc.actual_result}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Steps List */}
                 {tc.steps && tc.steps.length > 0 && (
                   <div className="mt-2.5 space-y-1 bg-[#F8F9FA] rounded-lg p-2.5 border border-[#E6E6E6] font-mono text-[11px]">
                     <span className="text-[10px] uppercase font-bold text-[#8C8C8C] block mb-1">
                       Playwright Actions ({tc.steps.length} steps):
                     </span>
-                    {tc.steps.map((st: any, sIdx: number) => (
+                    {tc.steps.map((st, sIdx) => (
                       <div key={sIdx} className="flex items-center gap-2 text-[#594139]">
                         <span className="text-[#8C8C8C] select-none">{sIdx + 1}.</span>
                         <span className="font-semibold text-[#212121]">{st.action}</span>
@@ -432,8 +486,8 @@ export default function ReportDetailPage() {
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Findings Section */}
       <Card className="p-0 overflow-hidden bg-white border border-[#E6E6E6] rounded-xl">
@@ -445,12 +499,56 @@ export default function ReportDetailPage() {
         </div>
 
         {/* Filters Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border-b border-[#E6E6E6] bg-[#FAFAFA]">
-          {/* Severity Tabs */}
+        <div className="flex flex-col gap-3 p-4 border-b border-[#E6E6E6] bg-[#FAFAFA]">
+          {/* Row 1: Pillar filter + Search */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Pillar filter */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C8C8C] mr-1">Pillar:</span>
+              {[
+                { key: "all",           label: "All Pillars",    color: "bg-[#212121] text-white",           border: "" },
+                { key: "functional",    label: "Functional",     color: "bg-[#EFF8FF] text-[#175CD3]",       border: "border-[#B2DDFF]" },
+                { key: "security",      label: "Security",       color: "bg-[#ECFDF3] text-[#027A48]",       border: "border-[#A6F4C5]" },
+                { key: "performance",   label: "Performance",    color: "bg-[#FDF4FF] text-[#C11574]",       border: "border-[#EEAAFD]" },
+                { key: "accessibility", label: "Accessibility",  color: "bg-[#FFF1EB] text-[#FF6C37]",       border: "border-[#FFBA97]" },
+              ].map(({ key, label, color, border }) => {
+                const count = key === "all" ? allFindings.length : allFindings.filter((f) => f.pillar === key).length;
+                const isActive = pillarFilter === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setPillarFilter(key)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      isActive
+                        ? key === "all" ? "bg-[#212121] text-white border-[#212121] shadow-xs" : `${color} ${border}`
+                        : "bg-white text-[#6B6B6B] hover:text-[#212121] border-[#E6E6E6]"
+                    }`}
+                  >
+                    {label} <span className="ml-1 text-[10px] opacity-75">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Box */}
+            <div className="relative w-full md:w-72 shrink-0">
+              <Search className="w-3.5 h-3.5 text-[#8C8C8C] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search by title or fingerprint..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] placeholder-[#8C8C8C] focus:outline-none focus:border-[#FF6C37]"
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Severity filter */}
           <div className="flex flex-wrap items-center gap-1.5">
-            {["all", "critical", "high", "medium", "low"].map((sev) => {
-              const count =
-                sev === "all" ? allFindings.length : allFindings.filter((f) => f.severity === sev).length;
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C8C8C] mr-1">Severity:</span>
+            {["all", "critical", "high", "medium", "low", "info"].map((sev) => {
+              const base = pillarFilter === "all" ? allFindings : allFindings.filter((f) => f.pillar === pillarFilter);
+              const count = sev === "all" ? base.length : base.filter((f) => f.severity === sev).length;
               return (
                 <button
                   key={sev}
@@ -465,18 +563,14 @@ export default function ReportDetailPage() {
                 </button>
               );
             })}
-          </div>
-
-          {/* Search Box */}
-          <div className="relative w-full md:w-72">
-            <Search className="w-3.5 h-3.5 text-[#8C8C8C] absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by title or fingerprint..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] placeholder-[#8C8C8C] focus:outline-none focus:border-[#FF6C37]"
-            />
+            {(pillarFilter !== "all" || severityFilter !== "all" || searchQuery) && (
+              <button
+                onClick={() => { setPillarFilter("all"); setSeverityFilter("all"); setSearchQuery(""); }}
+                className="ml-2 px-2.5 py-1 rounded-lg text-[11px] text-[#B42318] bg-[#FEF3F2] border border-[#FECDCA] hover:bg-[#FEE4E2] transition-colors cursor-pointer font-medium"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
 
@@ -486,6 +580,7 @@ export default function ReportDetailPage() {
             <thead>
               <tr className="border-b border-[#E6E6E6] bg-[#F5F3F3] text-[#594139] uppercase tracking-wider text-[10px] font-semibold">
                 <th className="py-3 px-4">Severity</th>
+                <th className="py-3 px-4">Pillar</th>
                 <th className="py-3 px-4">Finding Title & Diagnosis</th>
                 <th className="py-3 px-4">Fingerprint</th>
                 <th className="py-3 px-4 text-right">Action</th>
@@ -494,12 +589,20 @@ export default function ReportDetailPage() {
             <tbody className="divide-y divide-[#E6E6E6]">
               {filteredFindings.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-[#8C8C8C]">
+                  <td colSpan={5} className="py-8 text-center text-[#8C8C8C]">
                     No findings match the selected filters.
                   </td>
                 </tr>
               ) : (
-                filteredFindings.map((finding, index) => (
+                filteredFindings.map((finding, index) => {
+                  const pillarColors: Record<string, string> = {
+                    functional:    "bg-[#EFF8FF] text-[#175CD3] border-[#B2DDFF]",
+                    security:      "bg-[#ECFDF3] text-[#027A48] border-[#A6F4C5]",
+                    performance:   "bg-[#FDF4FF] text-[#C11574] border-[#EEAAFD]",
+                    accessibility: "bg-[#FFF1EB] text-[#FF6C37] border-[#FFBA97]",
+                  };
+                  const pillarStyle = pillarColors[finding.pillar] || "bg-[#F0F0F0] text-[#6B6B6B] border-[#E6E6E6]";
+                  return (
                   <tr
                     key={`${finding.id}-${finding.selector_or_url ?? ""}-${index}`}
                     onClick={() => setSelectedFinding(finding)}
@@ -507,6 +610,11 @@ export default function ReportDetailPage() {
                   >
                     <td className="py-3.5 px-4 align-top">
                       <SeverityPill severity={finding.severity} size="sm" />
+                    </td>
+                    <td className="py-3.5 px-4 align-top">
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${pillarStyle}`}>
+                        {finding.pillar}
+                      </span>
                     </td>
                     <td className="py-3.5 px-4 align-top max-w-lg">
                       <p className="font-semibold text-[#212121] text-sm">{finding.title}</p>
@@ -533,7 +641,8 @@ export default function ReportDetailPage() {
                       </Button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
