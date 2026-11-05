@@ -273,7 +273,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
           }
           const final = await pollUntilDone(
             run.id,
-            (parseInt(timeoutSeconds, 10) || 600) * 1000 + 30000,
+            Math.max(24 * 60 * 60 * 1000, (parseInt(timeoutSeconds, 10) || 600) * 1000 + 30000),
             setCurrentMessage,
           );
           activeRunIdRef.current = null;
@@ -540,7 +540,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                 <div className="space-y-3">
                   <div>
                     <label className="block text-[11px] font-medium text-[#594139] mb-1">
-                      Maximum generated cases per page
+                      Cases per page batch
                     </label>
                     <input
                       type="number"
@@ -550,7 +550,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                       onChange={(event) => setMaxGeneratedCases(Math.max(1, Math.min(100000, Number(event.target.value) || 1)))}
                       className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
                     />
-                    <p className="mt-1 text-[10px] text-[#8C8C8C]">The scanner runs up to this many deterministic cases, then reports the exact remaining count as pending. Increase it to cover more cases in one run.</p>
+                    <p className="mt-1 text-[10px] text-[#8C8C8C]">The scanner saves its cursor and automatically continues in another batch until this page is complete. Stop cancels the active run.</p>
                   </div>
                   <Switch
                     label="Test every action order"
@@ -608,7 +608,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
 
           <div className="bg-[#FFF8F6] border border-[#FFD5C8] rounded-lg px-4 py-3 text-xs text-[#594139]">
             <strong>{selectedModules.length} selected modules</strong> will be scanned sequentially.
-            Estimated time: <strong>~{Math.round(selectedModules.length * (parseInt(timeoutSeconds) || 600) / 60)} min</strong> total.
+            Estimated base time: <strong>~{Math.round(selectedModules.length * (parseInt(timeoutSeconds) || 600) / 60)} min</strong>. Large matrices continue in additional batches until complete.
           </div>
 
           <div className="flex justify-between pt-1">

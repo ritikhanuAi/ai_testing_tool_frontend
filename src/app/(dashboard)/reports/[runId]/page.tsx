@@ -400,7 +400,7 @@ export default function ReportDetailPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <p className="break-all font-mono text-[11px] text-[#594139]">{page.page_url}</p>
                   <p className="shrink-0 text-[11px] text-[#6B6B6B]">
-                    {page.executed_cases}/{page.planned_cases} executed · {page.factors_discovered} factors · limit {page.case_limit}
+                    {page.executed_cases}/{page.planned_cases} executed · {page.factors_discovered} factors · batch size {page.case_limit}
                     {page.action_order_permutations ? " · action orders permuted" : ""}
                   </p>
                 </div>
