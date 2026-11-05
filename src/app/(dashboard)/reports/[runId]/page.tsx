@@ -11,12 +11,13 @@ import { SeverityPill } from "@/components/common/SeverityPill";
 import { FindingDetailModal } from "@/components/reports/FindingDetailModal";
 import { useReportSummary, reportService } from "@/features/reports";
 import { useTestRun } from "@/features/test-runs";
-import { PillarFinding } from "@/types/report";
+import { InteractionMatrixPage, PillarFinding } from "@/types/report";
 import { formatDate } from "@/lib/utils";
 import {
   ArrowLeft,
   ShieldCheck,
   ShieldAlert,
+  AlertTriangle,
   Layers,
   Shield,
   Zap,
@@ -84,6 +85,15 @@ export default function ReportDetailPage() {
   const effectiveWeights = report.report_data?.effective_pillar_weights || {};
   const executedTestCases = report.report_data?.test_cases || [];
   const testCaseMode = report.report_data?.test_case_mode;
+  const auditIncomplete = Boolean(report.report_data?.incomplete);
+  const functionalMetrics = (pillarResults.functional?.metrics ?? {}) as Record<string, unknown>;
+  const combinatorialPages = Array.isArray(functionalMetrics.combinatorial_pages)
+    ? functionalMetrics.combinatorial_pages as InteractionMatrixPage[]
+    : [];
+  const plannedMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.planned_cases || 0), 0);
+  const executedMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.executed_cases || 0), 0);
+  const pendingMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.pending_cases || 0), 0);
+  const hasExhaustiveMatrix = combinatorialPages.some((page) => page.mode === "exhaustive_cartesian");
 
   const isFunctionalSkipped = pillarResults.functional?.status === "SKIPPED";
   const isSecuritySkipped = pillarResults.security?.status === "SKIPPED";
@@ -138,10 +148,10 @@ export default function ReportDetailPage() {
               {testCaseMode === "ai" && (
                 <span
                   className="inline-flex items-center gap-1 text-xs font-semibold text-[#6941C6] bg-[#FAF5FF] px-2.5 py-0.5 rounded border border-[#E9D7FE]"
-                  title="AI explored the site and wrote the test cases for this scan."
+                  title={hasExhaustiveMatrix ? "The deterministic finite-domain interaction manifest and its executed/pending coverage are shown below." : "AI explored the site and wrote the test cases for this scan."}
                 >
-                  <Sparkles className="w-3 h-3" />
-                  AI test cases
+                  {hasExhaustiveMatrix ? <Layers className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                  {hasExhaustiveMatrix ? "Exhaustive interaction matrix" : "AI test cases"}
                 </span>
               )}
             </div>
@@ -162,9 +172,9 @@ export default function ReportDetailPage() {
                 screenshot review in this report.
               </p>
             )}
-            {report.report_data?.incomplete && (
+            {auditIncomplete && (
               <p className="text-xs text-[#B54708] mt-1">
-                Partial report: {report.report_data.incomplete_reason || "some checks did not finish in time."}
+                Coverage incomplete: {report.report_data.incomplete_reason || "some checks did not finish in time."}
               </p>
             )}
           </div>
@@ -200,12 +210,19 @@ export default function ReportDetailPage() {
                 <GradeBadge grade={report.grade} size="lg" />
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase border ${
-                    report.passed
+                    auditIncomplete
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : report.passed
                       ? "bg-[#ECFDF3] text-[#027A48] border-[#A6F4C5]"
                       : "bg-[#FEF3F2] text-[#B42318] border-[#FECDCA]"
                   }`}
                 >
-                  {report.passed ? (
+                  {auditIncomplete ? (
+                    <>
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      COVERAGE INCOMPLETE
+                    </>
+                  ) : report.passed ? (
                     <>
                       <ShieldCheck className="w-3.5 h-3.5 text-[#12B76A]" />
                       AUDIT PASSED
@@ -361,6 +378,63 @@ export default function ReportDetailPage() {
         </Card>
       </div>
 
+      {hasExhaustiveMatrix && (
+        <Card className="border border-[#E6E6E6] bg-white">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-[#212121]">Interaction matrix coverage</h2>
+              <p className="mt-1 text-xs text-[#6B6B6B]">
+                Cases cover the Cartesian product of discovered finite control values. Repeated same-name row buttons are alternatives in one factor; action-order permutations apply only to actions selected in a case. Text inputs use configured values, with empty input included.
+              </p>
+            </div>
+            <div className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${pendingMatrixCases > 0
+              ? "border-amber-200 bg-amber-50 text-amber-700"
+              : "border-green-200 bg-green-50 text-green-700"}`}>
+              {executedMatrixCases} / {plannedMatrixCases} cases executed
+              {pendingMatrixCases > 0 && ` · ${pendingMatrixCases} pending`}
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {combinatorialPages.map((page, pageIndex) => (
+              <div key={`${page.page_url}-${pageIndex}`} className="rounded-lg border border-[#E6E6E6] bg-[#FAFAFA] p-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <p className="break-all font-mono text-[11px] text-[#594139]">{page.page_url}</p>
+                  <p className="shrink-0 text-[11px] text-[#6B6B6B]">
+                    {page.executed_cases}/{page.planned_cases} executed · {page.factors_discovered} factors · limit {page.case_limit}
+                    {page.action_order_permutations ? " · action orders permuted" : ""}
+                  </p>
+                </div>
+                {page.factors && page.factors.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {page.factors.map((factor) => (
+                      <span key={factor.id} className="rounded border border-[#E6E6E6] bg-white px-2 py-1 text-[10px] text-[#594139]">
+                        {factor.label}: {factor.values.length} value{factor.values.length === 1 ? "" : "s"}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {!page.complete && page.interruption_reason && (
+                  <p className="mt-2 text-[11px] text-amber-700">{page.interruption_reason}</p>
+                )}
+                {page.discovery_errors?.map((error, errorIndex) => (
+                  <p key={errorIndex} className="mt-1 text-[11px] text-amber-700">{error}</p>
+                ))}
+                {page.unsupported_controls?.map((control, controlIndex) => (
+                  <p key={controlIndex} className="mt-1 text-[11px] text-amber-700">
+                    Not enumerated: {control.label} — {control.reason}
+                  </p>
+                ))}
+                {page.dynamic_controls?.map((control, controlIndex) => (
+                  <p key={controlIndex} className="mt-1 text-[11px] text-amber-700">
+                    Dynamic control: {control.label || control.role || control.selector} — {control.reason}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* AI Executive Summary Box */}
       <div className="p-4 rounded-xl bg-[#FFF8E6] border border-[#FEDF89] flex items-start gap-3.5">
         <Sparkles className="w-5 h-5 text-[#F79009] shrink-0 mt-0.5" />
@@ -388,7 +462,7 @@ export default function ReportDetailPage() {
             </h3>
             <p className="text-xs text-[#6B6B6B] mt-0.5">
               {executedTestCases.length > 0
-                ? `${executedTestCases.length} browser scenario(s) synthesized and executed by Playwright`
+                ? `${executedTestCases.length} browser case(s) executed by Playwright${hasExhaustiveMatrix ? ` · ${pendingMatrixCases} matrix case(s) pending` : ""}`
                 : "No test cases were executed in this scan"}
             </p>
           </div>
@@ -407,7 +481,9 @@ export default function ReportDetailPage() {
                 ? "The Functional pillar was skipped in this scan profile."
                 : testCaseMode === "human"
                 ? "No human test cases were provided for this scan."
-                : "The AI did not find interactive elements to test, or all discovered cases were skipped (read-only mode). Try enabling AI test goals or checking the module URL."}
+                : hasExhaustiveMatrix
+                ? "No eligible interaction cases were executed. Review the interaction matrix coverage above for pending cases or discovery blockers."
+                : "No interactive elements or scenarios were found for this page. Check the module URL or provide an authored test pack."}
             </p>
           </div>
         ) : (
@@ -433,12 +509,14 @@ export default function ReportDetailPage() {
                   </div>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase shrink-0 ${
-                      tc.passed
+                      tc.status === "BLOCKED"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : tc.passed
                         ? "bg-[#ECFDF3] text-[#027A48] border border-[#12B76A]/30"
                         : "bg-[#FEF3F2] text-[#B42318] border border-[#F04438]/30"
                     }`}
                   >
-                    {tc.passed ? "PASSED" : "FAILED"}
+                    {tc.status || (tc.passed ? "PASSED" : "FAILED")}
                   </span>
                 </div>
 
@@ -476,7 +554,7 @@ export default function ReportDetailPage() {
                         <span className="font-semibold text-[#212121]">{st.action}</span>
                         {st.target && <span className="text-[#175CD3]">{st.target}</span>}
                         {st.value && <span className="text-[#027A48]">➔ &quot;{st.value}&quot;</span>}
-                        <span className={`ml-auto text-[10px] ${st.status === "FAILED" ? "text-[#B42318] font-bold" : "text-[#12B76A]"}`}>
+                        <span className={`ml-auto text-[10px] ${st.status === "FAILED" ? "text-[#B42318] font-bold" : st.status === "BLOCKED" ? "text-amber-700 font-bold" : "text-[#12B76A]"}`}>
                           {st.status || "PASSED"}
                         </span>
                       </div>

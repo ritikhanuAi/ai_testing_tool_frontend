@@ -343,7 +343,7 @@ export default function WebsiteTestingPage() {
           allow_state_changing: !readOnlyMode,
           rate_limit_rps: rateLimitRps || 10,
           timeout_seconds: parseInt(timeoutSeconds, 10) || 120,
-          max_crawl_depth: maxDepth || 2,
+          max_crawl_depth: maxDepth,
           use_ai_generation: useAiGeneration,
           ai_test_goals: aiTestGoals.trim() || undefined,
           max_ai_cases: maxAiCases || 5,

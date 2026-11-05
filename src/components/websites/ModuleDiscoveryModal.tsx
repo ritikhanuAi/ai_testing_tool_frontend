@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search, AlertTriangle, Ban } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { AuthenticationDrawer } from "@/components/websites/AuthenticationDrawer";
 import { AdvancedExecutionAccordion, ViewportProfileType } from "@/components/websites/AdvancedExecutionAccordion";
 import { Button } from "@/components/common/Button";
+import { Switch } from "@/components/common/Input";
 import * as testRunService from "@/features/test-runs/api/testRunService";
 import {
   AuthenticationPayload,
@@ -37,12 +38,21 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function pollUntilDone(runId: string, maxMs = 180_000) {
+async function pollUntilDone(runId: string, maxMs = 180_000, onProgress?: (message: string) => void) {
   const interval = 5000;
   const maxAttempts = Math.ceil(maxMs / interval);
   for (let i = 0; i < maxAttempts; i++) {
     await sleep(interval);
     const run = await testRunService.getTestRun(runId);
+    if (onProgress && i % 2 === 0) {
+      try {
+        const logs = await testRunService.getRunLogs(runId);
+        const latest = logs.logs[logs.logs.length - 1];
+        if (latest?.message) onProgress(latest.message);
+      } catch {
+        // Status polling remains sufficient if progress logs are unavailable.
+      }
+    }
     if (["completed", "failed", "cancelled"].includes(run.status)) return run;
   }
   throw new Error("Scan timed out waiting for completion");
@@ -79,7 +89,11 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
-  const [maxDepth, setMaxDepth] = useState(1); // test this page, then its directly linked pages
+  const [maxDepth, setMaxDepth] = useState(0); // selected page only unless linked-page traversal is enabled
+  const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
+  const [interactionTestValues, setInteractionTestValues] = useState("sample\n__no_matching_result__");
+  const [includeActionOrderPermutations, setIncludeActionOrderPermutations] = useState(false);
+  const [maxGeneratedCases, setMaxGeneratedCases] = useState(1000);
   const [rateLimitRps, setRateLimitRps] = useState(10);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
   const [recordTrace, setRecordTrace] = useState(true);
@@ -92,7 +106,9 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   // Step 4 — Execution
   const [scanResults, setScanResults] = useState<ModuleScanResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState("");
   const stopRef = useRef(false);
+  const activeRunIdRef = useRef<string | null>(null);
 
   // Sync initialUrl when modal opens
   useEffect(() => {
@@ -136,7 +152,11 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setViewportWidth(1440);
     setViewportHeight(900);
     setTimeoutSeconds("600");
-    setMaxDepth(1);
+    setMaxDepth(0);
+    setExhaustiveInteractions(true);
+    setInteractionTestValues("sample\n__no_matching_result__");
+    setIncludeActionOrderPermutations(false);
+    setMaxGeneratedCases(1000);
     setRateLimitRps(10);
     setReadOnlyMode(false);
     setRecordTrace(true);
@@ -212,6 +232,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       timeout_seconds: parseInt(timeoutSeconds, 10) || 600,
       max_crawl_depth: maxDepth,
       include_sitemap_urls: false,
+      exhaustive_interactions: exhaustiveInteractions,
+      interaction_test_values: interactionTestValues.split("\n").map((value) => value.trim()).filter(Boolean),
+      include_action_order_permutations: includeActionOrderPermutations,
+      max_generated_cases: maxGeneratedCases,
       rate_limit_rps: rateLimitRps || 10,
       allow_state_changing: !readOnlyMode,
       record_trace: recordTrace,
@@ -226,6 +250,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       for (let i = 0; i < selected.length; i++) {
         if (stopRef.current) break;
         setCurrentIndex(i);
+        setCurrentMessage("Starting selected module...");
         setScanResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: "running" } : r));
 
         const mod = selected[i];
@@ -241,21 +266,39 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
 
         try {
           const run = await testRunService.quickScan(payload);
-          const final = await pollUntilDone(run.id, (parseInt(timeoutSeconds, 10) || 600) * 1000 + 30000);
+          activeRunIdRef.current = run.id;
+          setScanResults((prev) => prev.map((r, idx) => idx === i ? { ...r, runId: run.id } : r));
+          if (stopRef.current) {
+            await testRunService.cancelScan(run.id).catch(() => undefined);
+          }
+          const final = await pollUntilDone(
+            run.id,
+            (parseInt(timeoutSeconds, 10) || 600) * 1000 + 30000,
+            setCurrentMessage,
+          );
+          activeRunIdRef.current = null;
+          const incompleteCoverage = final.error_message?.toLowerCase().includes("coverage incomplete") ||
+            final.error_message?.toLowerCase().includes("interaction cases remain") ||
+            final.error_message?.toLowerCase().includes("partial report") ||
+            final.error_message?.toLowerCase().includes("time limit");
           setScanResults((prev) =>
             prev.map((r, idx) =>
               idx === i
-                ? { ...r, runId: final.id, status: final.status === "completed" ? "completed" : "failed", score: final.overall_score, grade: final.grade, errorMessage: final.error_message ?? undefined }
+                ? { ...r, runId: final.id, status: final.status === "cancelled" ? "cancelled" : final.status === "completed" ? (incompleteCoverage ? "incomplete" : "completed") : "failed", score: final.overall_score, grade: final.grade, errorMessage: final.error_message ?? undefined }
                 : r
             )
           );
         } catch (err) {
+          activeRunIdRef.current = null;
           setScanResults((prev) =>
             prev.map((r, idx) =>
               idx === i ? { ...r, status: "failed", errorMessage: err instanceof Error ? err.message : "Scan failed" } : r
             )
           );
         }
+      }
+      if (stopRef.current) {
+        setScanResults((prev) => prev.map((r) => r.status === "pending" ? { ...r, status: "cancelled" } : r));
       }
       setStep(5);
     })();
@@ -266,8 +309,21 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   function StatusIcon({ status }: { status: ModuleScanStatus }) {
     if (status === "pending") return <Clock className="w-4 h-4 text-gray-400" />;
     if (status === "running") return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
-    if (status === "completed") return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+    if (status === "incomplete") return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+    if (status === "cancelled") return <Ban className="w-4 h-4 text-gray-500" />;
     return <XCircle className="w-4 h-4 text-red-500" />;
+  }
+
+  async function stopTesting() {
+    stopRef.current = true;
+    const runId = activeRunIdRef.current;
+    if (runId) {
+      try {
+        await testRunService.cancelScan(runId);
+      } catch {
+        // The queue will still stop before starting the next selected module.
+      }
+    }
   }
 
   function PillarChip({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -286,6 +342,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
 
   const completedCount = scanResults.filter((r) => r.status === "completed").length;
   const failedCount = scanResults.filter((r) => r.status === "failed").length;
+  const incompleteCount = scanResults.filter((r) => r.status === "incomplete").length;
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Discover & Scan Modules" maxWidth="4xl">
@@ -389,7 +446,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                   <div />
                   <div>Module</div>
                   <div>URL</div>
-                  <div>AI Test Goal</div>
+                  <div>AI Test Goal (exploratory mode)</div>
                 </div>
                 <div className="max-h-72 overflow-y-auto divide-y divide-[#F5F3F3]">
                   {moduleRows.map((row, idx) => (
@@ -452,6 +509,68 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             </div>
           </div>
 
+          <div className="space-y-3 rounded-xl border border-[#E6E6E6] bg-[#FBF9F8] p-4">
+            <div>
+              <p className="text-xs font-semibold text-[#212121]">Interaction coverage</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[#6B6B6B]">
+                Each page gets a deterministic case queue. Dropdown options, checkbox states, radio choices, tabs, and the configured text values are combined, then every case reloads that same page before running.
+              </p>
+            </div>
+            <Switch
+              label="Exhaustive combinations"
+              description="Run the full Cartesian product of discovered control values. Turn this off only to use the bounded exploratory journey."
+              checked={exhaustiveInteractions}
+              onChange={setExhaustiveInteractions}
+            />
+            {exhaustiveInteractions && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#594139] mb-1">
+                    Text and search test values (one per line)
+                  </label>
+                  <textarea
+                    value={interactionTestValues}
+                    onChange={(event) => setInteractionTestValues(event.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg bg-white border border-[#E6E6E6] px-3 py-2 text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+                    aria-label="Text and search test values"
+                  />
+                  <p className="mt-1 text-[10px] text-[#8C8C8C]">An empty value is always tested. These values apply to text inputs and appear in the report; use synthetic data.</p>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-[#594139] mb-1">
+                      Maximum generated cases per page
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100000}
+                      value={maxGeneratedCases}
+                      onChange={(event) => setMaxGeneratedCases(Math.max(1, Math.min(100000, Number(event.target.value) || 1)))}
+                      className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+                    />
+                    <p className="mt-1 text-[10px] text-[#8C8C8C]">The scanner runs up to this many deterministic cases, then reports the exact remaining count as pending. Increase it to cover more cases in one run.</p>
+                  </div>
+                  <Switch
+                    label="Test every action order"
+                    description="Also permute the actions chosen in each case. Untouched controls are excluded; repeated same-name row buttons are grouped as alternatives."
+                    checked={includeActionOrderPermutations}
+                    onChange={setIncludeActionOrderPermutations}
+                  />
+                </div>
+              </div>
+            )}
+            <p className="text-[10px] text-[#8C8C8C]">
+              Current-page-only is the default. Increase crawl depth to include linked pages; each page must finish its case queue before the next page is opened.
+            </p>
+            {exhaustiveInteractions && (
+              <p className="text-[10px] text-[#8C8C8C]">
+                The per-module AI goal is used only when exhaustive combinations are turned off; exhaustive mode tests every discovered safe control factor directly.
+              </p>
+            )}
+          </div>
+
           {/* Advanced Execution Options — same accordion used on websites page */}
           <AdvancedExecutionAccordion
             advancedOpen={advancedOpen}
@@ -488,7 +607,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
           />
 
           <div className="bg-[#FFF8F6] border border-[#FFD5C8] rounded-lg px-4 py-3 text-xs text-[#594139]">
-            <strong>{selectedModules.length} modules</strong> will be scanned sequentially.
+            <strong>{selectedModules.length} selected modules</strong> will be scanned sequentially.
             Estimated time: <strong>~{Math.round(selectedModules.length * (parseInt(timeoutSeconds) || 600) / 60)} min</strong> total.
           </div>
 
@@ -509,12 +628,13 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
               Scanning module {Math.min(currentIndex + 1, scanResults.length)} of {scanResults.length}...
             </p>
             <button
-              onClick={() => { stopRef.current = true; }}
+              onClick={stopTesting}
               className="text-xs text-red-500 hover:underline"
             >
               Stop
             </button>
           </div>
+          {currentMessage && <p className="text-xs text-[#6B6B6B] break-words">{currentMessage}</p>}
 
           <div className="border border-[#E6E6E6] rounded-xl divide-y divide-[#F5F3F3] max-h-80 overflow-y-auto">
             {scanResults.map((r, idx) => (
@@ -530,6 +650,8 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                   {r.status === "completed" && r.score != null && (
                     <span className="text-green-600 font-semibold">{r.score.toFixed(0)}/100</span>
                   )}
+                  {r.status === "incomplete" && <span className="text-amber-600 font-medium">Coverage incomplete</span>}
+                  {r.status === "cancelled" && <span className="text-gray-500">Stopped</span>}
                   {r.status === "failed" && <span className="text-red-500">Failed</span>}
                 </div>
               </div>
@@ -541,7 +663,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       {/* ── Step 5: Summary ────────────────────────────────────────────────── */}
       {step === 5 && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-[#F5F3F3] rounded-xl p-3 text-center">
               <p className="text-2xl font-bold text-[#212121]">{scanResults.length}</p>
               <p className="text-xs text-[#6B6B6B] mt-0.5">Total Scanned</p>
@@ -554,6 +676,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
               <p className="text-2xl font-bold text-red-600">{failedCount}</p>
               <p className="text-xs text-red-700 mt-0.5">Failed</p>
             </div>
+            <div className="bg-amber-50 rounded-xl p-3 text-center">
+              <p className="text-2xl font-bold text-amber-600">{incompleteCount}</p>
+              <p className="text-xs text-amber-700 mt-0.5">Coverage Incomplete</p>
+            </div>
           </div>
 
           <div className="border border-[#E6E6E6] rounded-xl divide-y divide-[#F5F3F3] max-h-72 overflow-y-auto">
@@ -564,6 +690,9 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                   <p className="text-sm font-medium text-[#212121] truncate">{r.moduleName}</p>
                   {r.status === "failed" && r.errorMessage && (
                     <p className="text-xs text-red-500 truncate">{r.errorMessage}</p>
+                  )}
+                  {r.status === "incomplete" && r.errorMessage && (
+                    <p className="text-xs text-amber-600 truncate">{r.errorMessage}</p>
                   )}
                 </div>
                 {r.grade && (

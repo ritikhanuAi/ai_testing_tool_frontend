@@ -186,18 +186,18 @@ export function AdvancedExecutionAccordion({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-medium text-[#594139] mb-1">
-                  Exploration Max Depth ({maxDepth} hops)
+                  Exploration Max Depth ({maxDepth === 0 ? "selected page only" : `${maxDepth} hops`})
                 </label>
                 <input
                   type="range"
-                  min="1"
+                  min="0"
                   max="5"
                   value={maxDepth}
                   onChange={(e) => setMaxDepth(Number(e.target.value))}
                   className="w-full accent-[#FF6C37] cursor-pointer"
                 />
                 <span className="text-[10px] text-[#8C8C8C] flex justify-between">
-                  <span>1 hop (Shallow)</span>
+                  <span>0 = selected page only</span>
                   <span>5 hops (Deep)</span>
                 </span>
               </div>

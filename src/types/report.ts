@@ -24,8 +24,39 @@ export interface TestCaseStepResult {
   action: string;
   target?: string | null;
   value?: string | null;
-  status: "PASSED" | "FAILED";
+  status: "PASSED" | "FAILED" | "BLOCKED";
+  expected?: string;
+  actual?: string;
   error?: string;
+}
+
+export interface InteractionMatrixFactor {
+  id: string;
+  label: string;
+  kind: string;
+  values: string[];
+}
+
+export interface InteractionMatrixPage {
+  page_url: string;
+  mode: string;
+  factors_discovered: number;
+  factors?: InteractionMatrixFactor[];
+  planned_cases: number;
+  executed_cases: number;
+  passed_cases: number;
+  failed_cases: number;
+  blocked_cases: number;
+  pending_cases: number;
+  case_limit: number;
+  limit_exceeded: boolean;
+  action_order_permutations: boolean;
+  complete: boolean;
+  discovery_complete?: boolean;
+  interruption_reason?: string | null;
+  discovery_errors?: string[];
+  unsupported_controls?: Array<{ label: string; reason: string }>;
+  dynamic_controls?: Array<{ selector: string; role?: string; label?: string; reason: string }>;
 }
 
 export interface ExecutedTestCase {
@@ -42,6 +73,11 @@ export interface ExecutedTestCase {
   steps: TestCaseStepResult[];
   assertions_count?: number;
   passed: boolean;
+  status?: "PASSED" | "FAILED" | "BLOCKED";
+  coverage_mode?: string;
+  combination?: Record<string, string>;
+  action_order?: string[];
+  evidence_path?: string;
 }
 
 export interface UnifiedReportData {

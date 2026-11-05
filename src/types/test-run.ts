@@ -27,6 +27,10 @@ export interface AdvancedExecutionOptions {
   timeout_seconds?: number;
   max_crawl_depth?: number;
   include_sitemap_urls?: boolean;
+  exhaustive_interactions?: boolean;
+  interaction_test_values?: string[];
+  include_action_order_permutations?: boolean;
+  max_generated_cases?: number;
   use_ai_generation?: boolean;
   ai_test_goals?: string;
   max_ai_cases?: number;
@@ -143,7 +147,7 @@ export type WizardModuleRow = DiscoveredModule & {
   goal: string;
 };
 
-export type ModuleScanStatus = "pending" | "running" | "completed" | "failed";
+export type ModuleScanStatus = "pending" | "running" | "completed" | "incomplete" | "failed" | "cancelled";
 
 export interface ModuleScanResult {
   moduleUrl: string;
