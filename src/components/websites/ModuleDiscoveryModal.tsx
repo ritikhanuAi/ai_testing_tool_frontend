@@ -14,6 +14,7 @@ import {
   ModuleScanResult,
   ModuleScanStatus,
   QuickScanRequest,
+  InteractionPriority,
 } from "@/types/test-run";
 
 interface ModuleDiscoveryModalProps {
@@ -25,6 +26,13 @@ interface ModuleDiscoveryModalProps {
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 const STEP_LABELS = ["URL & Auth", "Modules", "Settings", "Running", "Results"];
+const INTERACTION_PRIORITY_LABELS: Record<InteractionPriority, string> = {
+  dropdown: "Dropdowns",
+  search: "Search bars",
+  navigation: "Linked page navigation",
+  button: "Button actions",
+};
+const INTERACTION_PRIORITY_OPTIONS: InteractionPriority[] = ["dropdown", "search", "navigation", "button"];
 
 const GRADE_COLORS: Record<string, string> = {
   A: "text-green-600 bg-green-50",
@@ -89,9 +97,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [viewportWidth, setViewportWidth] = useState(1440);
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
-  const [maxDepth, setMaxDepth] = useState(0); // selected page only unless linked-page traversal is enabled
+  const [maxDepth, setMaxDepth] = useState(1); // include directly linked pages; deeper traversal remains user-controlled
   const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
   const [interactionTestValues, setInteractionTestValues] = useState("sample\n__no_matching_result__");
+  const [interactionPriorityOrder, setInteractionPriorityOrder] = useState<InteractionPriority[]>(INTERACTION_PRIORITY_OPTIONS);
   const [includeActionOrderPermutations, setIncludeActionOrderPermutations] = useState(false);
   const [maxGeneratedCases, setMaxGeneratedCases] = useState(1000);
   const [rateLimitRps, setRateLimitRps] = useState(10);
@@ -152,9 +161,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setViewportWidth(1440);
     setViewportHeight(900);
     setTimeoutSeconds("600");
-    setMaxDepth(0);
+    setMaxDepth(1);
     setExhaustiveInteractions(true);
     setInteractionTestValues("sample\n__no_matching_result__");
+    setInteractionPriorityOrder(INTERACTION_PRIORITY_OPTIONS);
     setIncludeActionOrderPermutations(false);
     setMaxGeneratedCases(1000);
     setRateLimitRps(10);
@@ -206,6 +216,17 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setModuleRows((rows) => rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
   }
 
+  function updateInteractionPriority(position: number, value: InteractionPriority) {
+    setInteractionPriorityOrder((current) => {
+      const next = [...current];
+      const previousValue = next[position];
+      const targetPosition = next.indexOf(value);
+      next[position] = value;
+      next[targetPosition] = previousValue;
+      return next;
+    });
+  }
+
   // ── Step 3 → Step 4: sequential scan execution ───────────────────────────
   useEffect(() => {
     if (step !== 4) return;
@@ -234,6 +255,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       include_sitemap_urls: false,
       exhaustive_interactions: exhaustiveInteractions,
       interaction_test_values: interactionTestValues.split("\n").map((value) => value.trim()).filter(Boolean),
+      interaction_priority_order: interactionPriorityOrder,
       include_action_order_permutations: includeActionOrderPermutations,
       max_generated_cases: maxGeneratedCases,
       rate_limit_rps: rateLimitRps || 10,
@@ -513,7 +535,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             <div>
               <p className="text-xs font-semibold text-[#212121]">Interaction coverage</p>
               <p className="mt-1 text-[11px] leading-relaxed text-[#6B6B6B]">
-                Each page gets a deterministic case queue. Dropdown options, checkbox states, radio choices, tabs, and the configured text values are combined, then every case reloads that same page before running.
+                Each page gets a deterministic case queue. Dropdowns, search fields, linked-page navigation, and button actions are the first-priority areas. All discovered values still run; priority changes the order, not the coverage size.
               </p>
             </div>
             <Switch
@@ -524,6 +546,31 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             />
             {exhaustiveInteractions && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-medium text-[#594139] mb-1">
+                    Interaction priority order
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {interactionPriorityOrder.map((priority, index) => (
+                      <label key={priority} className="flex items-center gap-2 text-[11px] text-[#594139]">
+                        <span className="w-16 shrink-0">Priority {index + 1}</span>
+                        <select
+                          value={priority}
+                          onChange={(event) => updateInteractionPriority(index, event.target.value as InteractionPriority)}
+                          className="h-8 flex-1 rounded-lg bg-white border border-[#E6E6E6] px-2 text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+                          aria-label={`Interaction priority ${index + 1}`}
+                        >
+                          {INTERACTION_PRIORITY_OPTIONS.map((option) => (
+                            <option key={option} value={option}>{INTERACTION_PRIORITY_LABELS[option]}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[10px] text-[#8C8C8C]">
+                    Priority orders discovered control cases. Linked pages are still opened only after this page&apos;s case queue completes, preserving page-first testing.
+                  </p>
+                </div>
                 <div>
                   <label className="block text-[11px] font-medium text-[#594139] mb-1">
                     Text and search test values (one per line)
@@ -554,7 +601,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
                   </div>
                   <Switch
                     label="Test every action order"
-                    description="Also permute the actions chosen in each case. Untouched controls are excluded; repeated same-name row buttons are grouped as alternatives."
+                    description="Permute actions within each priority tier. Higher-priority actions always run first; untouched controls are excluded. Repeated same-name row buttons are alternatives."
                     checked={includeActionOrderPermutations}
                     onChange={setIncludeActionOrderPermutations}
                   />
@@ -562,7 +609,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
               </div>
             )}
             <p className="text-[10px] text-[#8C8C8C]">
-              Current-page-only is the default. Increase crawl depth to include linked pages; each page must finish its case queue before the next page is opened.
+              Directly linked pages are included by default. Each page must finish its case queue before the scanner opens its linked pages; increase depth to follow deeper routes.
             </p>
             {exhaustiveInteractions && (
               <p className="text-[10px] text-[#8C8C8C]">

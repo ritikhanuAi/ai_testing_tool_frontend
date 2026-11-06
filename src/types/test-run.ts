@@ -29,6 +29,7 @@ export interface AdvancedExecutionOptions {
   include_sitemap_urls?: boolean;
   exhaustive_interactions?: boolean;
   interaction_test_values?: string[];
+  interaction_priority_order?: InteractionPriority[];
   include_action_order_permutations?: boolean;
   max_generated_cases?: number;
   use_ai_generation?: boolean;
@@ -36,6 +37,8 @@ export interface AdvancedExecutionOptions {
   max_ai_cases?: number;
   ai_explain_failures?: boolean;
 }
+
+export type InteractionPriority = "dropdown" | "search" | "navigation" | "button";
 
 export interface QuickScanRequest {
   url: string;

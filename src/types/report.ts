@@ -35,6 +35,7 @@ export interface InteractionMatrixFactor {
   label: string;
   kind: string;
   values: string[];
+  setup_actions?: string[];
 }
 
 export interface InteractionMatrixPage {
@@ -51,12 +52,15 @@ export interface InteractionMatrixPage {
   case_limit: number;
   limit_exceeded: boolean;
   action_order_permutations: boolean;
+  priority_order?: Array<"dropdown" | "search" | "navigation" | "button">;
   complete: boolean;
   discovery_complete?: boolean;
   interruption_reason?: string | null;
   discovery_errors?: string[];
   unsupported_controls?: Array<{ label: string; reason: string }>;
   dynamic_controls?: Array<{ selector: string; role?: string; label?: string; reason: string }>;
+  dynamic_controls_discovered?: Array<{ selector: string; label?: string; trigger?: string }>;
+  linked_routes_discovered?: string[];
 }
 
 export interface ExecutedTestCase {

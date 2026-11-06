@@ -29,6 +29,13 @@ import {
   UserRound,
 } from "lucide-react";
 
+const INTERACTION_PRIORITY_LABELS: Record<string, string> = {
+  dropdown: "Dropdowns",
+  search: "Search bars",
+  navigation: "Linked page navigation",
+  button: "Button actions",
+};
+
 export default function ReportDetailPage() {
   const params = useParams();
   const runId = params.runId as string;
@@ -93,6 +100,7 @@ export default function ReportDetailPage() {
   const plannedMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.planned_cases || 0), 0);
   const executedMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.executed_cases || 0), 0);
   const pendingMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.pending_cases || 0), 0);
+  const matrixCoverageComplete = combinatorialPages.length > 0 && combinatorialPages.every((page) => page.complete);
   const hasExhaustiveMatrix = combinatorialPages.some((page) => page.mode === "exhaustive_cartesian");
 
   const isFunctionalSkipped = pillarResults.functional?.status === "SKIPPED";
@@ -384,14 +392,15 @@ export default function ReportDetailPage() {
             <div>
               <h2 className="text-base font-semibold text-[#212121]">Interaction matrix coverage</h2>
               <p className="mt-1 text-xs text-[#6B6B6B]">
-                Cases cover the Cartesian product of discovered finite control values. Repeated same-name row buttons are alternatives in one factor; action-order permutations apply only to actions selected in a case. Text inputs use configured values, with empty input included.
+                Cases cover the Cartesian product of discovered finite control values. Priority tiers stay in order even when action permutations are enabled; actions permute only within the same tier. Repeated same-name row buttons are alternatives in one factor. Text inputs use configured values, with empty input included. Linked pages are opened after the current page case queue completes.
               </p>
             </div>
-            <div className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${pendingMatrixCases > 0
+            <div className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${pendingMatrixCases > 0 || !matrixCoverageComplete
               ? "border-amber-200 bg-amber-50 text-amber-700"
               : "border-green-200 bg-green-50 text-green-700"}`}>
               {executedMatrixCases} / {plannedMatrixCases} cases executed
               {pendingMatrixCases > 0 && ` · ${pendingMatrixCases} pending`}
+              {pendingMatrixCases === 0 && !matrixCoverageComplete && " · control coverage incomplete"}
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -401,14 +410,20 @@ export default function ReportDetailPage() {
                   <p className="break-all font-mono text-[11px] text-[#594139]">{page.page_url}</p>
                   <p className="shrink-0 text-[11px] text-[#6B6B6B]">
                     {page.executed_cases}/{page.planned_cases} executed · {page.factors_discovered} factors · batch size {page.case_limit}
-                    {page.action_order_permutations ? " · action orders permuted" : ""}
+                    {page.action_order_permutations ? " · within-priority action orders permuted" : ""}
                   </p>
                 </div>
+                {page.priority_order && (
+                  <p className="mt-1 text-[10px] text-[#6B6B6B]">
+                    Priority: {page.priority_order.map((priority) => INTERACTION_PRIORITY_LABELS[priority] || priority).join(" → ")}
+                  </p>
+                )}
                 {page.factors && page.factors.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {page.factors.map((factor) => (
                       <span key={factor.id} className="rounded border border-[#E6E6E6] bg-white px-2 py-1 text-[10px] text-[#594139]">
                         {factor.label}: {factor.values.length} value{factor.values.length === 1 ? "" : "s"}
+                        {factor.setup_actions?.length ? ` · opened by ${factor.setup_actions.join(" → ")}` : ""}
                       </span>
                     ))}
                   </div>
@@ -427,6 +442,16 @@ export default function ReportDetailPage() {
                 {page.dynamic_controls?.map((control, controlIndex) => (
                   <p key={controlIndex} className="mt-1 text-[11px] text-amber-700">
                     Dynamic control: {control.label || control.role || control.selector} — {control.reason}
+                  </p>
+                ))}
+                {page.dynamic_controls_discovered?.map((control, controlIndex) => (
+                  <p key={`discovered-${controlIndex}`} className="mt-1 text-[11px] text-green-700">
+                    Added to this page&apos;s cases: {control.label || control.selector}{control.trigger ? ` (opened by ${control.trigger})` : ""}.
+                  </p>
+                ))}
+                {page.linked_routes_discovered?.map((route, routeIndex) => (
+                  <p key={`linked-route-${routeIndex}`} className="mt-1 text-[11px] text-[#594139]">
+                    Linked page found in a control: {route}{page.complete ? " · eligible for the linked-page crawl" : " · waiting for this page's coverage to complete"}
                   </p>
                 ))}
               </div>
