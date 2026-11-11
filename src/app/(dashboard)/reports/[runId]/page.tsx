@@ -101,7 +101,11 @@ export default function ReportDetailPage() {
   const executedMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.executed_cases || 0), 0);
   const pendingMatrixCases = combinatorialPages.reduce((sum, page) => sum + (page.pending_cases || 0), 0);
   const matrixCoverageComplete = combinatorialPages.length > 0 && combinatorialPages.every((page) => page.complete);
-  const hasExhaustiveMatrix = combinatorialPages.some((page) => page.mode === "exhaustive_cartesian");
+  const interactionMatrixMode = combinatorialPages.find(
+    (page) => page.mode === "exhaustive_cartesian" || page.mode === "pairwise",
+  )?.mode;
+  const hasInteractionMatrix = Boolean(interactionMatrixMode);
+  const interactionMatrixLabel = interactionMatrixMode === "pairwise" ? "Pairwise interaction matrix" : "Exhaustive interaction matrix";
 
   const isFunctionalSkipped = pillarResults.functional?.status === "SKIPPED";
   const isSecuritySkipped = pillarResults.security?.status === "SKIPPED";
@@ -156,10 +160,10 @@ export default function ReportDetailPage() {
               {testCaseMode === "ai" && (
                 <span
                   className="inline-flex items-center gap-1 text-xs font-semibold text-[#6941C6] bg-[#FAF5FF] px-2.5 py-0.5 rounded border border-[#E9D7FE]"
-                  title={hasExhaustiveMatrix ? "The deterministic finite-domain interaction manifest and its executed/pending coverage are shown below." : "AI explored the site and wrote the test cases for this scan."}
+                  title={hasInteractionMatrix ? "The deterministic finite-domain interaction manifest and its executed/pending coverage are shown below." : "AI explored the site and wrote the test cases for this scan."}
                 >
-                  {hasExhaustiveMatrix ? <Layers className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
-                  {hasExhaustiveMatrix ? "Exhaustive interaction matrix" : "AI test cases"}
+                  {hasInteractionMatrix ? <Layers className="w-3 h-3" /> : <Sparkles className="w-3 h-3" />}
+                  {hasInteractionMatrix ? interactionMatrixLabel : "AI test cases"}
                 </span>
               )}
             </div>
@@ -386,13 +390,16 @@ export default function ReportDetailPage() {
         </Card>
       </div>
 
-      {hasExhaustiveMatrix && (
+      {hasInteractionMatrix && (
         <Card className="border border-[#E6E6E6] bg-white">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-[#212121]">Interaction matrix coverage</h2>
               <p className="mt-1 text-xs text-[#6B6B6B]">
-                Cases cover the Cartesian product of discovered finite control values. Priority tiers stay in order even when action permutations are enabled; actions permute only within the same tier. Repeated same-name row buttons are alternatives in one factor. Text inputs use configured values, with empty input included. Linked pages are opened after the current page case queue completes.
+                {interactionMatrixMode === "pairwise"
+                  ? "Cases cover every pair of discovered finite control values, including the required combinations. This reduces the case count while leaving some three-way and higher interactions untested. "
+                  : "Cases cover the Cartesian product of discovered finite control values, including the required combinations. "}
+                Priority tiers stay in order even when action permutations are enabled; actions permute only within the same tier. Repeated same-name row buttons are alternatives in one factor. Text inputs use configured values, with empty input included. Linked pages are opened after the current page case queue completes.
               </p>
             </div>
             <div className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold ${pendingMatrixCases > 0 || !matrixCoverageComplete
@@ -487,7 +494,7 @@ export default function ReportDetailPage() {
             </h3>
             <p className="text-xs text-[#6B6B6B] mt-0.5">
               {executedTestCases.length > 0
-                ? `${executedTestCases.length} browser case(s) executed by Playwright${hasExhaustiveMatrix ? ` · ${pendingMatrixCases} matrix case(s) pending` : ""}`
+                ? `${executedTestCases.length} browser case(s) executed by Playwright${hasInteractionMatrix ? ` · ${pendingMatrixCases} matrix case(s) pending` : ""}`
                 : "No test cases were executed in this scan"}
             </p>
           </div>
@@ -506,7 +513,7 @@ export default function ReportDetailPage() {
                 ? "The Functional pillar was skipped in this scan profile."
                 : testCaseMode === "human"
                 ? "No human test cases were provided for this scan."
-                : hasExhaustiveMatrix
+                : hasInteractionMatrix
                 ? "No eligible interaction cases were executed. Review the interaction matrix coverage above for pending cases or discovery blockers."
                 : "No interactive elements or scenarios were found for this page. Check the module URL or provide an authored test pack."}
             </p>

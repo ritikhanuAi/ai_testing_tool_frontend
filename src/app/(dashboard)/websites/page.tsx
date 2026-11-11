@@ -8,7 +8,14 @@ import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
 import { useQuickScan, useExecuteCustomScan, useTestRun, useCancelScan } from "@/features/test-runs";
 import { useTestPacks, parseTestCasesText, readTestCaseFile } from "@/features/test-packs";
-import { QuickScanRequest, AdvancedExecutionOptions, TestCaseMode } from "@/types/test-run";
+import {
+  QuickScanRequest,
+  AdvancedExecutionOptions,
+  TestCaseMode,
+  InteractionCategory,
+  InteractionCoverageMode,
+} from "@/types/test-run";
+import { DEFAULT_INTERACTION_CATEGORIES, parseRequiredCombinations } from "@/lib/interaction-coverage";
 import { TestCaseModeSection } from "@/components/websites/TestCaseModeSection";
 import {
   UrlProtocolInput,
@@ -65,6 +72,11 @@ export default function WebsiteTestingPage() {
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("120");
   const [maxDepth, setMaxDepth] = useState(2);
+  const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
+  const [interactionCoverageMode, setInteractionCoverageMode] = useState<InteractionCoverageMode>("exhaustive");
+  const [interactionCategories, setInteractionCategories] = useState<InteractionCategory[]>(DEFAULT_INTERACTION_CATEGORIES);
+  const [requiredCombinationsText, setRequiredCombinationsText] = useState("");
+  const [requiredCombinationsError, setRequiredCombinationsError] = useState<string | undefined>();
   const [rateLimitRps, setRateLimitRps] = useState(10);
   const [readOnlyMode, setReadOnlyMode] = useState(true);
   const [recordTrace, setRecordTrace] = useState(true);
@@ -313,6 +325,13 @@ export default function WebsiteTestingPage() {
       }
     }
 
+    const parsedRequiredCombinations = parseRequiredCombinations(requiredCombinationsText);
+    setRequiredCombinationsError(parsedRequiredCombinations.error);
+    if (testMode === "ai" && exhaustiveInteractions && parsedRequiredCombinations.error) {
+      setSubmissionError(parsedRequiredCombinations.error);
+      return;
+    }
+
     try {
       const payload: QuickScanRequest = {
         url: `${protocol}${cleanDomain}`,
@@ -344,6 +363,10 @@ export default function WebsiteTestingPage() {
           rate_limit_rps: rateLimitRps || 10,
           timeout_seconds: parseInt(timeoutSeconds, 10) || 120,
           max_crawl_depth: maxDepth,
+          exhaustive_interactions: exhaustiveInteractions,
+          interaction_coverage_mode: interactionCoverageMode,
+          interaction_categories: interactionCategories,
+          interaction_required_combinations: parsedRequiredCombinations.combinations ?? [],
           use_ai_generation: useAiGeneration,
           ai_test_goals: aiTestGoals.trim() || undefined,
           max_ai_cases: maxAiCases || 5,
@@ -412,6 +435,11 @@ export default function WebsiteTestingPage() {
     setViewportHeight(900);
     setTimeoutSeconds("120");
     setMaxDepth(2);
+    setExhaustiveInteractions(true);
+    setInteractionCoverageMode("exhaustive");
+    setInteractionCategories(DEFAULT_INTERACTION_CATEGORIES);
+    setRequiredCombinationsText("");
+    setRequiredCombinationsError(undefined);
     setRateLimitRps(10);
     setReadOnlyMode(true);
     setRecordTrace(true);
@@ -669,6 +697,19 @@ export default function WebsiteTestingPage() {
                 headedBrowser={headedBrowser}
                 setHeadedBrowser={setHeadedBrowser}
                 aiOptionsEnabled={testMode === "ai"}
+                interactionCoverageEnabled={testMode === "ai"}
+                exhaustiveInteractions={exhaustiveInteractions}
+                setExhaustiveInteractions={setExhaustiveInteractions}
+                interactionCoverageMode={interactionCoverageMode}
+                setInteractionCoverageMode={setInteractionCoverageMode}
+                interactionCategories={interactionCategories}
+                setInteractionCategories={setInteractionCategories}
+                requiredCombinationsText={requiredCombinationsText}
+                setRequiredCombinationsText={(value) => {
+                  setRequiredCombinationsText(value);
+                  setRequiredCombinationsError(undefined);
+                }}
+                requiredCombinationsError={requiredCombinationsError}
               />
 
               {/* Action Buttons */}

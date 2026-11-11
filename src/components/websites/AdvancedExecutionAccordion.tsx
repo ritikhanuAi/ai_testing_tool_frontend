@@ -3,6 +3,8 @@
 import React from "react";
 import { SlidersHorizontal, ChevronDown, ChevronUp, Laptop, Shield, Sparkles } from "lucide-react";
 import { Switch } from "@/components/common/Input";
+import { InteractionCoverageControls } from "@/components/websites/InteractionCoverageControls";
+import { InteractionCategory, InteractionCoverageMode } from "@/types/test-run";
 
 export type ViewportProfileType = "desktop" | "laptop" | "tablet" | "mobile" | "custom";
 
@@ -39,6 +41,17 @@ interface AdvancedExecutionAccordionProps {
   setHeadedBrowser?: (val: boolean) => void;
   /** False in human test case mode: AI options are hidden because no AI runs. */
   aiOptionsEnabled?: boolean;
+  showInteractionCoverage?: boolean;
+  interactionCoverageEnabled?: boolean;
+  exhaustiveInteractions: boolean;
+  setExhaustiveInteractions: (val: boolean) => void;
+  interactionCoverageMode: InteractionCoverageMode;
+  setInteractionCoverageMode: (val: InteractionCoverageMode) => void;
+  interactionCategories: InteractionCategory[];
+  setInteractionCategories: (val: InteractionCategory[]) => void;
+  requiredCombinationsText: string;
+  setRequiredCombinationsText: (val: string) => void;
+  requiredCombinationsError?: string;
 }
 
 export function AdvancedExecutionAccordion({
@@ -73,6 +86,17 @@ export function AdvancedExecutionAccordion({
   headedBrowser = false,
   setHeadedBrowser = () => {},
   aiOptionsEnabled = true,
+  showInteractionCoverage = true,
+  interactionCoverageEnabled = true,
+  exhaustiveInteractions,
+  setExhaustiveInteractions,
+  interactionCoverageMode,
+  setInteractionCoverageMode,
+  interactionCategories,
+  setInteractionCategories,
+  requiredCombinationsText,
+  setRequiredCombinationsText,
+  requiredCombinationsError,
 }: AdvancedExecutionAccordionProps) {
   return (
     <div className="pt-1">
@@ -241,6 +265,27 @@ export function AdvancedExecutionAccordion({
               />
             </div>
           </div>
+
+          {showInteractionCoverage && (
+            <div className="pt-2 border-t border-[#E6E6E6]">
+              <h4 className="text-xs font-semibold text-[#212121] mb-2">Interaction Coverage</h4>
+              <InteractionCoverageControls
+                enabled={exhaustiveInteractions}
+                onEnabledChange={setExhaustiveInteractions}
+                mode={interactionCoverageMode}
+                onModeChange={setInteractionCoverageMode}
+                categories={interactionCategories}
+                onCategoriesChange={setInteractionCategories}
+                requiredCombinationsText={requiredCombinationsText}
+                onRequiredCombinationsTextChange={setRequiredCombinationsText}
+                error={requiredCombinationsError}
+                disabled={!interactionCoverageEnabled}
+              />
+              {!interactionCoverageEnabled && (
+                <p className="mt-1 text-[10px] text-[#8C8C8C]">Interaction coverage settings apply to AI scans. Human test case mode runs the authored cases.</p>
+              )}
+            </div>
+          )}
 
           {/* Part 3: AI Intelligence Options */}
           <div className="pt-2 border-t border-[#E6E6E6]">

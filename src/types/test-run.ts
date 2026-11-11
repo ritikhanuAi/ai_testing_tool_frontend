@@ -28,6 +28,9 @@ export interface AdvancedExecutionOptions {
   max_crawl_depth?: number;
   include_sitemap_urls?: boolean;
   exhaustive_interactions?: boolean;
+  interaction_coverage_mode?: InteractionCoverageMode;
+  interaction_categories?: InteractionCategory[];
+  interaction_required_combinations?: Record<string, string>[];
   interaction_test_values?: string[];
   interaction_priority_order?: InteractionPriority[];
   include_action_order_permutations?: boolean;
@@ -39,6 +42,8 @@ export interface AdvancedExecutionOptions {
 }
 
 export type InteractionPriority = "dropdown" | "search" | "navigation" | "button";
+export type InteractionCoverageMode = "exhaustive" | "pairwise";
+export type InteractionCategory = "dropdown" | "search" | "navigation" | "button" | "form";
 
 export interface QuickScanRequest {
   url: string;

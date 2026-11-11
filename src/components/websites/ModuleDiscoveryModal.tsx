@@ -5,6 +5,7 @@ import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, Externa
 import { Modal } from "@/components/common/Modal";
 import { AuthenticationDrawer } from "@/components/websites/AuthenticationDrawer";
 import { AdvancedExecutionAccordion, ViewportProfileType } from "@/components/websites/AdvancedExecutionAccordion";
+import { InteractionCoverageControls } from "@/components/websites/InteractionCoverageControls";
 import { Button } from "@/components/common/Button";
 import { Switch } from "@/components/common/Input";
 import * as testRunService from "@/features/test-runs/api/testRunService";
@@ -15,7 +16,10 @@ import {
   ModuleScanStatus,
   QuickScanRequest,
   InteractionPriority,
+  InteractionCategory,
+  InteractionCoverageMode,
 } from "@/types/test-run";
+import { DEFAULT_INTERACTION_CATEGORIES, parseRequiredCombinations } from "@/lib/interaction-coverage";
 
 interface ModuleDiscoveryModalProps {
   isOpen: boolean;
@@ -99,6 +103,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
   const [maxDepth, setMaxDepth] = useState(1); // include directly linked pages; deeper traversal remains user-controlled
   const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
+  const [interactionCoverageMode, setInteractionCoverageMode] = useState<InteractionCoverageMode>("exhaustive");
+  const [interactionCategories, setInteractionCategories] = useState<InteractionCategory[]>(DEFAULT_INTERACTION_CATEGORIES);
+  const [requiredCombinationsText, setRequiredCombinationsText] = useState("");
+  const [requiredCombinationsError, setRequiredCombinationsError] = useState<string | undefined>();
   const [interactionTestValues, setInteractionTestValues] = useState("sample\n__no_matching_result__");
   const [interactionPriorityOrder, setInteractionPriorityOrder] = useState<InteractionPriority[]>(INTERACTION_PRIORITY_OPTIONS);
   const [includeActionOrderPermutations, setIncludeActionOrderPermutations] = useState(false);
@@ -163,6 +171,10 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setTimeoutSeconds("600");
     setMaxDepth(1);
     setExhaustiveInteractions(true);
+    setInteractionCoverageMode("exhaustive");
+    setInteractionCategories(DEFAULT_INTERACTION_CATEGORIES);
+    setRequiredCombinationsText("");
+    setRequiredCombinationsError(undefined);
     setInteractionTestValues("sample\n__no_matching_result__");
     setInteractionPriorityOrder(INTERACTION_PRIORITY_OPTIONS);
     setIncludeActionOrderPermutations(false);
@@ -254,6 +266,9 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       max_crawl_depth: maxDepth,
       include_sitemap_urls: false,
       exhaustive_interactions: exhaustiveInteractions,
+      interaction_coverage_mode: interactionCoverageMode,
+      interaction_categories: interactionCategories,
+      interaction_required_combinations: parseRequiredCombinations(requiredCombinationsText).combinations ?? [],
       interaction_test_values: interactionTestValues.split("\n").map((value) => value.trim()).filter(Boolean),
       interaction_priority_order: interactionPriorityOrder,
       include_action_order_permutations: includeActionOrderPermutations,
@@ -535,14 +550,22 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             <div>
               <p className="text-xs font-semibold text-[#212121]">Interaction coverage</p>
               <p className="mt-1 text-[11px] leading-relaxed text-[#6B6B6B]">
-                Each page gets a deterministic case queue. Dropdowns, search fields, linked-page navigation, and button actions are the first-priority areas. All discovered values still run; priority changes the order, not the coverage size.
+                Choose exhaustive coverage for every selected value combination, or pairwise coverage to reduce cases while exercising every pair of selected values. Select which control categories matter and add critical combinations that must run.
               </p>
             </div>
-            <Switch
-              label="Exhaustive combinations"
-              description="Run the full Cartesian product of discovered control values. Turn this off only to use the bounded exploratory journey."
-              checked={exhaustiveInteractions}
-              onChange={setExhaustiveInteractions}
+            <InteractionCoverageControls
+              enabled={exhaustiveInteractions}
+              onEnabledChange={setExhaustiveInteractions}
+              mode={interactionCoverageMode}
+              onModeChange={setInteractionCoverageMode}
+              categories={interactionCategories}
+              onCategoriesChange={setInteractionCategories}
+              requiredCombinationsText={requiredCombinationsText}
+              onRequiredCombinationsTextChange={(value) => {
+                setRequiredCombinationsText(value);
+                setRequiredCombinationsError(undefined);
+              }}
+              error={requiredCombinationsError}
             />
             {exhaustiveInteractions && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -613,7 +636,7 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             </p>
             {exhaustiveInteractions && (
               <p className="text-[10px] text-[#8C8C8C]">
-                The per-module AI goal is used only when exhaustive combinations are turned off; exhaustive mode tests every discovered safe control factor directly.
+                The per-module AI goal is used when deterministic coverage is turned off. Pairwise covers every selected value pair; exhaustive covers the full product.
               </p>
             )}
           </div>
@@ -651,6 +674,15 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             headedBrowser={headedBrowser}
             setHeadedBrowser={setHeadedBrowser}
             aiOptionsEnabled={true}
+            showInteractionCoverage={false}
+            exhaustiveInteractions={exhaustiveInteractions}
+            setExhaustiveInteractions={setExhaustiveInteractions}
+            interactionCoverageMode={interactionCoverageMode}
+            setInteractionCoverageMode={setInteractionCoverageMode}
+            interactionCategories={interactionCategories}
+            setInteractionCategories={setInteractionCategories}
+            requiredCombinationsText={requiredCombinationsText}
+            setRequiredCombinationsText={setRequiredCombinationsText}
           />
 
           <div className="bg-[#FFF8F6] border border-[#FFD5C8] rounded-lg px-4 py-3 text-xs text-[#594139]">
@@ -660,7 +692,14 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
 
           <div className="flex justify-between pt-1">
             <Button variant="outline" onClick={() => setStep(2)}>← Back</Button>
-            <Button onClick={() => setStep(4)} rightIcon={<ChevronRight className="w-3.5 h-3.5" />}>
+            <Button
+              onClick={() => {
+                const parsed = parseRequiredCombinations(requiredCombinationsText);
+                setRequiredCombinationsError(parsed.error);
+                if (!parsed.error) setStep(4);
+              }}
+              rightIcon={<ChevronRight className="w-3.5 h-3.5" />}
+            >
               Run {selectedModules.length} Scan{selectedModules.length !== 1 ? "s" : ""}
             </Button>
           </div>
