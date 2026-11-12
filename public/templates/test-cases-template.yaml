@@ -1,0 +1,103 @@
+# Test case template for the AI Testing Platform.
+# Edit this file, then upload it under "Human test cases" to run as-is.
+#
+# Required fields per case: id, title, steps, assertions.
+# Everything else is optional and has sensible defaults.
+
+title: My Test Pack              # shown in the UI; the scan uses it as the run name
+version: "1.0.0"
+cases:
+
+  # ---------------------------------------------------------------------------
+  # Example 1 — form submission + success assertion (positive path)
+  # ---------------------------------------------------------------------------
+  - id: TC-FORM-001
+    title: Submit the DemoQA text box form and verify the output echo
+    pillar: functional             # functional | security | performance | accessibility
+    risk: read_only                # read_only | state_changing
+    tags: [smoke, forms]
+    steps:
+      - action: open_page
+        value: https://demoqa.com/text-box
+      - action: wait
+        timeout_ms: 1000           # tiny pause so React finishes hydrating
+      - action: type_text
+        target: "#userName"
+        value: Jane Doe
+      - action: type_text
+        target: "#userEmail"
+        value: jane.doe@example.com
+      - action: scroll
+        target: "#submit"
+      - action: click
+        target: "#submit"
+    assertions:
+      - type: element_visible
+        target: "#output"
+      - type: text_contains
+        target: "#output #name"
+        value: Jane Doe
+
+  # ---------------------------------------------------------------------------
+  # Example 2 — route change + URL assertion (navigation test)
+  # ---------------------------------------------------------------------------
+  - id: TC-NAV-001
+    title: Click a navigation link and verify the URL changes
+    pillar: functional
+    risk: read_only
+    tags: [navigation]
+    steps:
+      - action: open_page
+        value: https://demoqa.com/
+      - action: click
+        target: "div.card:has-text('Elements')"
+    assertions:
+      - type: url_contains
+        value: /elements
+
+  # ---------------------------------------------------------------------------
+  # Example 3 — negative validation (invalid input must be rejected)
+  # ---------------------------------------------------------------------------
+  - id: TC-VALIDATION-001
+    title: Reject invalid email format and show the error class
+    pillar: functional
+    risk: read_only
+    tags: [validation, negative]
+    steps:
+      - action: open_page
+        value: https://demoqa.com/text-box
+      - action: type_text
+        target: "#userEmail"
+        value: not-an-email@
+      - action: scroll
+        target: "#submit"
+      - action: click
+        target: "#submit"
+    assertions:
+      - type: element_visible
+        target: "input#userEmail.field-error"
+
+# ---------------------------------------------------------------------------
+# Supported actions:       open_page, click, type_text, select_option,
+#                          scroll, hover, wait, reload_page, download
+#
+# Supported assertions:    element_visible, element_hidden,
+#                          text_contains, text_equals, text_not_contains,
+#                          url_contains, page_title_contains,
+#                          status_code_equals, option_list_not_empty,
+#                          attribute_equals,
+#                          page_load_time_less_than,
+#                          response_time_less_than,
+#                          render_time_less_than
+#
+# Selector tips (most reliable first):
+#   #my-id                             — id
+#   [data-testid='add-to-cart']        — test id
+#   input[name='email']                — name attribute
+#   button[type='submit']              — attribute + tag
+#   role=button[name='Sign In']        — Playwright role selector
+#
+# Risk levels:
+#   read_only       — never writes data; runs unconditionally (use for 95% of tests)
+#   state_changing  — writes data; blocked unless the scan has Safe Mode OFF
+# ---------------------------------------------------------------------------

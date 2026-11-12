@@ -4,7 +4,7 @@ import React from "react";
 import { SlidersHorizontal, ChevronDown, ChevronUp, Laptop, Shield, Sparkles } from "lucide-react";
 import { Switch } from "@/components/common/Input";
 import { InteractionCoverageControls } from "@/components/websites/InteractionCoverageControls";
-import { InteractionCategory, InteractionCoverageMode } from "@/types/test-run";
+import { InteractionCategory, InteractionCoverageMode, TraversalStrategy } from "@/types/test-run";
 
 export type ViewportProfileType = "desktop" | "laptop" | "tablet" | "mobile" | "custom";
 
@@ -23,6 +23,16 @@ interface AdvancedExecutionAccordionProps {
   setTimeoutSeconds: (val: string) => void;
   maxDepth: number;
   setMaxDepth: (val: number) => void;
+  maxPages: number;
+  setMaxPages: (val: number) => void;
+  traversalStrategy: TraversalStrategy;
+  setTraversalStrategy: (val: TraversalStrategy) => void;
+  exploreButtonNavigations: boolean;
+  setExploreButtonNavigations: (val: boolean) => void;
+  continueOnIncompleteCoverage: boolean;
+  setContinueOnIncompleteCoverage: (val: boolean) => void;
+  perPageTimeBudgetSeconds: number;
+  setPerPageTimeBudgetSeconds: (val: number) => void;
   rateLimitRps: number;
   setRateLimitRps: (val: number) => void;
   readOnlyMode: boolean;
@@ -69,6 +79,16 @@ export function AdvancedExecutionAccordion({
   setTimeoutSeconds,
   maxDepth,
   setMaxDepth,
+  maxPages,
+  setMaxPages,
+  traversalStrategy,
+  setTraversalStrategy,
+  exploreButtonNavigations,
+  setExploreButtonNavigations,
+  continueOnIncompleteCoverage,
+  setContinueOnIncompleteCoverage,
+  perPageTimeBudgetSeconds,
+  setPerPageTimeBudgetSeconds,
   rateLimitRps,
   setRateLimitRps,
   readOnlyMode,
@@ -115,7 +135,7 @@ export function AdvancedExecutionAccordion({
         <div className="flex items-center gap-2">
           {!advancedOpen && (
             <span className="hidden sm:inline font-mono text-[10px] text-[#594139] bg-[#F5F3F3] px-2 py-0.5 rounded border border-[#E6E6E6]">
-              {browserEngine.toUpperCase()} • {viewportProfile} • Depth {maxDepth} • {timeoutSeconds}s • {readOnlyMode ? "Safe Mode" : "Mutations Allowed"}
+              {browserEngine.toUpperCase()} • {viewportProfile} • Depth {maxDepth}/{maxPages}p • {traversalStrategy.toUpperCase()} • {timeoutSeconds}s • {readOnlyMode ? "Safe Mode" : "Mutations Allowed"}
             </span>
           )}
           {advancedOpen ? (
@@ -255,6 +275,39 @@ export function AdvancedExecutionAccordion({
               </div>
             </div>
 
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-[#594139] mb-1">
+                  Max Pages to Explore ({maxPages})
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={maxPages}
+                  onChange={(e) => setMaxPages(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
+                  className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+                />
+                <span className="text-[10px] text-[#8C8C8C]">
+                  {maxDepth === 0 ? "Ignored at depth 0 — scans selected page only." : "Upper bound 500. Time budget still applies."}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-[#594139] mb-1">
+                  Traversal Strategy
+                </label>
+                <select
+                  value={traversalStrategy}
+                  onChange={(e) => setTraversalStrategy(e.target.value as TraversalStrategy)}
+                  className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+                >
+                  <option value="bfs">BFS (breadth-first — wide coverage)</option>
+                  <option value="dfs">DFS (depth-first — drill into flows)</option>
+                </select>
+              </div>
+            </div>
+
             {/* Read-Only Safety Switch */}
             <div className="mt-3 bg-[#FBF9F8] p-3 rounded-lg border border-[#E6E6E6]">
               <Switch
@@ -263,6 +316,42 @@ export function AdvancedExecutionAccordion({
                 checked={readOnlyMode}
                 onChange={setReadOnlyMode}
               />
+            </div>
+
+            <div className="mt-3 bg-[#FBF9F8] p-3 rounded-lg border border-[#E6E6E6]">
+              <Switch
+                label="Explore Button-Triggered Pages"
+                description="Also test popups, new tabs, and SPA routes opened by buttons. Clicks only safe-looking disclosure/view buttons; honors Safe Read-Only Mode."
+                checked={exploreButtonNavigations}
+                onChange={setExploreButtonNavigations}
+              />
+            </div>
+
+            <div className="mt-3 bg-[#FBF9F8] p-3 rounded-lg border border-[#E6E6E6]">
+              <Switch
+                label="Continue Crawl When Control Coverage Is Incomplete"
+                description="Still follow linked pages (e.g. Open Dashboard) when the control matrix can't fully enumerate every option. Turn off to stop the crawl at the first incomplete page."
+                checked={continueOnIncompleteCoverage}
+                onChange={setContinueOnIncompleteCoverage}
+              />
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-[#212121] mb-1">
+                Per-Page Time Budget (seconds)
+                <span className="ml-1 font-normal text-[#8C8C8C]">0 = no cap</span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={1800}
+                value={perPageTimeBudgetSeconds}
+                onChange={(e) => setPerPageTimeBudgetSeconds(parseInt(e.target.value, 10) || 0)}
+                className="w-full h-8 px-2 rounded-lg bg-white border border-[#E6E6E6] text-xs text-[#212121] focus:outline-none focus:border-[#FF6C37]"
+              />
+              <p className="mt-1 text-[10px] text-[#8C8C8C]">
+                Stops a single page&apos;s interaction matrix once its elapsed time hits this cap, so one slow page can&apos;t eat the whole scan budget. Leave at 0 to let any page use the full remaining budget.
+              </p>
             </div>
           </div>
 

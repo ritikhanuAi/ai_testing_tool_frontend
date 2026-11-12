@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Rocket, RotateCcw, PauseCircle, Loader2, AlertCircle, Layers, Shield, FileCode2 } from "lucide-react";
 import { Button } from "@/components/common/Button";
 import { Card } from "@/components/common/Card";
+import { Switch } from "@/components/common/Input";
 import { useQuickScan, useExecuteCustomScan, useTestRun, useCancelScan } from "@/features/test-runs";
 import { useTestPacks, parseTestCasesText, readTestCaseFile } from "@/features/test-packs";
 import {
@@ -14,6 +15,7 @@ import {
   TestCaseMode,
   InteractionCategory,
   InteractionCoverageMode,
+  TraversalStrategy,
 } from "@/types/test-run";
 import { DEFAULT_INTERACTION_CATEGORIES, parseRequiredCombinations } from "@/lib/interaction-coverage";
 import { TestCaseModeSection } from "@/components/websites/TestCaseModeSection";
@@ -72,6 +74,11 @@ export default function WebsiteTestingPage() {
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("120");
   const [maxDepth, setMaxDepth] = useState(2);
+  const [maxPages, setMaxPages] = useState(100);
+  const [traversalStrategy, setTraversalStrategy] = useState<TraversalStrategy>("bfs");
+  const [exploreButtonNavigations, setExploreButtonNavigations] = useState(false);
+  const [continueOnIncompleteCoverage, setContinueOnIncompleteCoverage] = useState(true);
+  const [perPageTimeBudgetSeconds, setPerPageTimeBudgetSeconds] = useState(0);
   const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
   const [interactionCoverageMode, setInteractionCoverageMode] = useState<InteractionCoverageMode>("exhaustive");
   const [interactionCategories, setInteractionCategories] = useState<InteractionCategory[]>(DEFAULT_INTERACTION_CATEGORIES);
@@ -363,6 +370,11 @@ export default function WebsiteTestingPage() {
           rate_limit_rps: rateLimitRps || 10,
           timeout_seconds: parseInt(timeoutSeconds, 10) || 120,
           max_crawl_depth: maxDepth,
+          max_pages: maxPages,
+          traversal_strategy: traversalStrategy,
+          explore_button_navigations: exploreButtonNavigations,
+          continue_on_incomplete_coverage: continueOnIncompleteCoverage,
+          per_page_time_budget_seconds: perPageTimeBudgetSeconds,
           exhaustive_interactions: exhaustiveInteractions,
           interaction_coverage_mode: interactionCoverageMode,
           interaction_categories: interactionCategories,
@@ -435,6 +447,11 @@ export default function WebsiteTestingPage() {
     setViewportHeight(900);
     setTimeoutSeconds("120");
     setMaxDepth(2);
+    setMaxPages(100);
+    setTraversalStrategy("bfs");
+    setExploreButtonNavigations(false);
+    setContinueOnIncompleteCoverage(true);
+    setPerPageTimeBudgetSeconds(0);
     setExhaustiveInteractions(true);
     setInteractionCoverageMode("exhaustive");
     setInteractionCategories(DEFAULT_INTERACTION_CATEGORIES);
@@ -597,6 +614,22 @@ export default function WebsiteTestingPage() {
       {/* ========================================================================= */}
       {executionState === "idle" && (
         <div className="flex flex-col w-full space-y-3.5">
+          <Card className="px-5 sm:px-6 py-3 shadow-xs">
+            <Switch
+              label="Discover modules first"
+              description="Crawl the site's navigation, pick the modules you care about, and scan each one separately. Replaces the standard scan form."
+              checked={moduleDiscoveryOpen}
+              onChange={setModuleDiscoveryOpen}
+            />
+          </Card>
+
+          {moduleDiscoveryOpen ? (
+            <ModuleDiscoveryModal
+              isOpen={moduleDiscoveryOpen}
+              onClose={() => setModuleDiscoveryOpen(false)}
+              initialUrl={domainPath ? `${protocol}${domainPath}` : undefined}
+            />
+          ) : (
           <Card className="p-5 sm:p-6 shadow-xs">
             <form onSubmit={handleStartTest} className="space-y-4">
               {/* Target Website URL Section */}
@@ -680,6 +713,16 @@ export default function WebsiteTestingPage() {
                 setTimeoutSeconds={setTimeoutSeconds}
                 maxDepth={maxDepth}
                 setMaxDepth={setMaxDepth}
+                maxPages={maxPages}
+                setMaxPages={setMaxPages}
+                traversalStrategy={traversalStrategy}
+                setTraversalStrategy={setTraversalStrategy}
+                exploreButtonNavigations={exploreButtonNavigations}
+                setExploreButtonNavigations={setExploreButtonNavigations}
+                continueOnIncompleteCoverage={continueOnIncompleteCoverage}
+                setContinueOnIncompleteCoverage={setContinueOnIncompleteCoverage}
+                perPageTimeBudgetSeconds={perPageTimeBudgetSeconds}
+                setPerPageTimeBudgetSeconds={setPerPageTimeBudgetSeconds}
                 rateLimitRps={rateLimitRps}
                 setRateLimitRps={setRateLimitRps}
                 readOnlyMode={readOnlyMode}
@@ -734,16 +777,6 @@ export default function WebsiteTestingPage() {
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
-                  size="md"
-                  disabled={isLaunching}
-                  onClick={() => setModuleDiscoveryOpen(true)}
-                  leftIcon={<Layers className="w-3.5 h-3.5" />}
-                >
-                  Discover Modules
-                </Button>
-                <Button
-                  type="button"
                   variant="secondary"
                   size="md"
                   disabled={isLaunching}
@@ -755,8 +788,10 @@ export default function WebsiteTestingPage() {
               </div>
             </form>
           </Card>
+          )}
 
           {/* Idle Engine Banner */}
+          {!moduleDiscoveryOpen && (
           <div className="p-3.5 rounded-xl bg-[#F5F3F3] border border-[#E6E6E6] text-center flex flex-col items-center justify-center gap-1">
             <PauseCircle className="w-4 h-4 text-[#8C8C8C]" />
             <p className="text-xs text-[#6B6B6B]">
@@ -764,8 +799,10 @@ export default function WebsiteTestingPage() {
               <span className="font-medium text-[#212121]">Start Test</span> to dispatch the autonomous verification worker.
             </p>
           </div>
+          )}
 
           {/* Capability Specs Grid */}
+          {!moduleDiscoveryOpen && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="bg-white border border-[#E6E6E6] rounded-xl p-3.5 sm:p-4 shadow-xs flex items-start gap-3">
               <div className="w-9 h-9 rounded-lg bg-[#F0F9FF] flex items-center justify-center text-[#0BA5EC] shrink-0">
@@ -803,6 +840,7 @@ export default function WebsiteTestingPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -851,12 +889,6 @@ export default function WebsiteTestingPage() {
         />
       )}
 
-      {/* Module Discovery Wizard Modal */}
-      <ModuleDiscoveryModal
-        isOpen={moduleDiscoveryOpen}
-        onClose={() => setModuleDiscoveryOpen(false)}
-        initialUrl={domainPath ? `${protocol}${domainPath}` : undefined}
-      />
     </div>
   );
 }

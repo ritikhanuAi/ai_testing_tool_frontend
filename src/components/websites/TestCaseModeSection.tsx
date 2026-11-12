@@ -2,7 +2,7 @@
 
 import React, { useRef } from "react";
 import Link from "next/link";
-import { Sparkles, UserRound, Upload, FileText, X, AlertCircle } from "lucide-react";
+import { Sparkles, UserRound, Upload, FileText, X, AlertCircle, Download } from "lucide-react";
 import { TestCaseMode } from "@/types/test-run";
 import { TestPackResponse } from "@/types/test-pack";
 import { TEST_CASE_FILE_ACCEPT } from "@/features/test-packs";
@@ -160,13 +160,35 @@ export function TestCaseModeSection({
             )}
           </div>
 
-          <p className="text-[11px] text-[#6B6B6B]">
-            Need to write test cases first?{" "}
-            <Link href="/test-packs/new" className="text-[#FF6C37] font-medium hover:underline">
-              Create a test pack
-            </Link>
-            . Human test cases run in the Functional check.
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#6B6B6B]">
+            <span>
+              Need to write test cases first?{" "}
+              <Link href="/test-packs/new" className="text-[#FF6C37] font-medium hover:underline">
+                Create a test pack
+              </Link>
+              . Human test cases run in the Functional check.
+            </span>
+            <span className="text-[#C7C7C7]">·</span>
+            <span className="inline-flex items-center gap-2">
+              <span>Download template:</span>
+              <a
+                href="/templates/test-cases-template.yaml"
+                download
+                className="inline-flex items-center gap-1 text-[#FF6C37] font-medium hover:underline"
+              >
+                <Download className="w-3 h-3" />
+                YAML
+              </a>
+              <a
+                href="/templates/test-cases-template.json"
+                download
+                className="inline-flex items-center gap-1 text-[#FF6C37] font-medium hover:underline"
+              >
+                <Download className="w-3 h-3" />
+                JSON
+              </a>
+            </span>
+          </div>
         </div>
       )}
 

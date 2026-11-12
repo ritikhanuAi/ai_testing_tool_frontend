@@ -1,0 +1,55 @@
+{
+  "title": "My Test Pack",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "TC-FORM-001",
+      "title": "Submit the DemoQA text box form and verify the output echo",
+      "pillar": "functional",
+      "risk": "read_only",
+      "tags": ["smoke", "forms"],
+      "steps": [
+        { "action": "open_page", "value": "https://demoqa.com/text-box" },
+        { "action": "wait", "timeout_ms": 1000 },
+        { "action": "type_text", "target": "#userName", "value": "Jane Doe" },
+        { "action": "type_text", "target": "#userEmail", "value": "jane.doe@example.com" },
+        { "action": "scroll", "target": "#submit" },
+        { "action": "click", "target": "#submit" }
+      ],
+      "assertions": [
+        { "type": "element_visible", "target": "#output" },
+        { "type": "text_contains", "target": "#output #name", "value": "Jane Doe" }
+      ]
+    },
+    {
+      "id": "TC-NAV-001",
+      "title": "Click a navigation link and verify the URL changes",
+      "pillar": "functional",
+      "risk": "read_only",
+      "tags": ["navigation"],
+      "steps": [
+        { "action": "open_page", "value": "https://demoqa.com/" },
+        { "action": "click", "target": "div.card:has-text('Elements')" }
+      ],
+      "assertions": [
+        { "type": "url_contains", "value": "/elements" }
+      ]
+    },
+    {
+      "id": "TC-VALIDATION-001",
+      "title": "Reject invalid email format and show the error class",
+      "pillar": "functional",
+      "risk": "read_only",
+      "tags": ["validation", "negative"],
+      "steps": [
+        { "action": "open_page", "value": "https://demoqa.com/text-box" },
+        { "action": "type_text", "target": "#userEmail", "value": "not-an-email@" },
+        { "action": "scroll", "target": "#submit" },
+        { "action": "click", "target": "#submit" }
+      ],
+      "assertions": [
+        { "type": "element_visible", "target": "input#userEmail.field-error" }
+      ]
+    }
+  ]
+}

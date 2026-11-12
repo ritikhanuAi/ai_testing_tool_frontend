@@ -458,7 +458,7 @@ export default function ReportDetailPage() {
                 ))}
                 {page.linked_routes_discovered?.map((route, routeIndex) => (
                   <p key={`linked-route-${routeIndex}`} className="mt-1 text-[11px] text-[#594139]">
-                    Linked page found in a control: {route}{page.complete ? " · eligible for the linked-page crawl" : " · waiting for this page's coverage to complete"}
+                    Linked page found in a control: {route}{page.complete ? " · eligible for the linked-page crawl" : " · queued for crawl (this page's coverage is incomplete)"}
                   </p>
                 ))}
               </div>

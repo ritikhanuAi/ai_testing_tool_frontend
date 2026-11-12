@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search, AlertTriangle, Ban } from "lucide-react";
-import { Modal } from "@/components/common/Modal";
+import { Loader2, CheckCircle2, XCircle, Clock, ChevronRight, RotateCcw, ExternalLink, Search, AlertTriangle, Ban, X } from "lucide-react";
 import { AuthenticationDrawer } from "@/components/websites/AuthenticationDrawer";
 import { AdvancedExecutionAccordion, ViewportProfileType } from "@/components/websites/AdvancedExecutionAccordion";
 import { InteractionCoverageControls } from "@/components/websites/InteractionCoverageControls";
@@ -18,6 +17,7 @@ import {
   InteractionPriority,
   InteractionCategory,
   InteractionCoverageMode,
+  TraversalStrategy,
 } from "@/types/test-run";
 import { DEFAULT_INTERACTION_CATEGORIES, parseRequiredCombinations } from "@/lib/interaction-coverage";
 
@@ -102,6 +102,11 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const [viewportHeight, setViewportHeight] = useState(900);
   const [timeoutSeconds, setTimeoutSeconds] = useState("600");
   const [maxDepth, setMaxDepth] = useState(1); // include directly linked pages; deeper traversal remains user-controlled
+  const [maxPages, setMaxPages] = useState(100);
+  const [traversalStrategy, setTraversalStrategy] = useState<TraversalStrategy>("bfs");
+  const [exploreButtonNavigations, setExploreButtonNavigations] = useState(false);
+  const [continueOnIncompleteCoverage, setContinueOnIncompleteCoverage] = useState(true);
+  const [perPageTimeBudgetSeconds, setPerPageTimeBudgetSeconds] = useState(0);
   const [exhaustiveInteractions, setExhaustiveInteractions] = useState(true);
   const [interactionCoverageMode, setInteractionCoverageMode] = useState<InteractionCoverageMode>("exhaustive");
   const [interactionCategories, setInteractionCategories] = useState<InteractionCategory[]>(DEFAULT_INTERACTION_CATEGORIES);
@@ -170,6 +175,11 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
     setViewportHeight(900);
     setTimeoutSeconds("600");
     setMaxDepth(1);
+    setMaxPages(100);
+    setTraversalStrategy("bfs");
+    setExploreButtonNavigations(false);
+    setContinueOnIncompleteCoverage(true);
+    setPerPageTimeBudgetSeconds(0);
     setExhaustiveInteractions(true);
     setInteractionCoverageMode("exhaustive");
     setInteractionCategories(DEFAULT_INTERACTION_CATEGORIES);
@@ -264,6 +274,11 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
       is_mobile: viewportProfile === "mobile",
       timeout_seconds: parseInt(timeoutSeconds, 10) || 600,
       max_crawl_depth: maxDepth,
+      max_pages: maxPages,
+      traversal_strategy: traversalStrategy,
+      explore_button_navigations: exploreButtonNavigations,
+      continue_on_incomplete_coverage: continueOnIncompleteCoverage,
+      per_page_time_budget_seconds: perPageTimeBudgetSeconds,
       include_sitemap_urls: false,
       exhaustive_interactions: exhaustiveInteractions,
       interaction_coverage_mode: interactionCoverageMode,
@@ -381,8 +396,27 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
   const failedCount = scanResults.filter((r) => r.status === "failed").length;
   const incompleteCount = scanResults.filter((r) => r.status === "incomplete").length;
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Discover & Scan Modules" maxWidth="4xl">
+    <div className="bg-white border border-[#E6E6E6] rounded-xl shadow-xs p-5 sm:p-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-[#212121]">Discover &amp; Scan Modules</h2>
+          <p className="text-xs text-[#6B6B6B] mt-0.5">
+            Crawl the navigation structure, pick the modules you care about, and scan each one independently.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleClose}
+          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[#8C8C8C] hover:bg-[#F5F3F3] hover:text-[#212121] transition-colors"
+          aria-label="Close module discovery panel"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Step indicator */}
       <div className="flex items-center gap-0 mb-6">
         {STEP_LABELS.map((label, i) => {
@@ -657,6 +691,16 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
             setTimeoutSeconds={setTimeoutSeconds}
             maxDepth={maxDepth}
             setMaxDepth={setMaxDepth}
+            maxPages={maxPages}
+            setMaxPages={setMaxPages}
+            traversalStrategy={traversalStrategy}
+            setTraversalStrategy={setTraversalStrategy}
+            exploreButtonNavigations={exploreButtonNavigations}
+            setExploreButtonNavigations={setExploreButtonNavigations}
+            continueOnIncompleteCoverage={continueOnIncompleteCoverage}
+            setContinueOnIncompleteCoverage={setContinueOnIncompleteCoverage}
+            perPageTimeBudgetSeconds={perPageTimeBudgetSeconds}
+            setPerPageTimeBudgetSeconds={setPerPageTimeBudgetSeconds}
             rateLimitRps={rateLimitRps}
             setRateLimitRps={setRateLimitRps}
             readOnlyMode={readOnlyMode}
@@ -812,6 +856,6 @@ export function ModuleDiscoveryModal({ isOpen, onClose, initialUrl = "" }: Modul
           </div>
         </div>
       )}
-    </Modal>
+    </div>
   );
 }
